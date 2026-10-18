@@ -25,9 +25,11 @@ To set up your environment, run:
 make setup   # Setup environment
 ```
 
-[Make](https://www.gnu.org/software/make/) serves as the task runner for code quality checks and fixes. Available targets:
+[Make](https://www.gnu.org/software/make/) serves as the task runner for code quality and testing. Available targets:
 
 ```bash
-make check   # Run all checks
-make fix     # Auto-fix findings
+make test     # Run test suite with coverage
+make check    # Run all checks
+make ci       # Full CI (lint + tests)
+make fix      # Auto-fix findings
 ```
