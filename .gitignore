@@ -16,3 +16,12 @@
 build/
 dist/
 *.egg-info/
+
+# Python & Tool Caches
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Coverage / Test artifacts
+.coverage
+htmlcov/
