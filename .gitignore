@@ -8,3 +8,11 @@
 # Editor swap files
 *.swp
 *.swo
+
+# Virtual environment
+.venv*/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
