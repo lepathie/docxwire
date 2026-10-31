@@ -19,6 +19,7 @@ classifiers = [
 
 dependencies = [
     "pypandoc-binary>=1.15",
+    "beautifulsoup4>=4.15.0",
 ]
 
 [dependency-groups]
@@ -27,7 +28,6 @@ dev = [
     "ruff>=0.17.1",
     "pytest>=8.0",
     "pytest-cov>=5.0",
-    "beautifulsoup4>=4.15.0",
     "pymarkdownlnt>=0.9.41",
 ]
 

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 from pathlib import Path
 
 import pypandoc
+from bs4 import BeautifulSoup
 
-from docxwire.converter.base import AbstractConverter, Article, Image
+from docxwire.converter.base import AbstractConverter, Article, Image, slugify
 
 
 class DocxConverter(AbstractConverter):
@@ -14,7 +16,7 @@ class DocxConverter(AbstractConverter):
         """Convert a .docx file to an article with raw HTML output."""
         media_dir = tempfile.mkdtemp(prefix="media-")
         try:
-            title = src.stem
+            fallback_title = src.stem
             html = pypandoc.convert_file(
                 str(src),
                 to="html-native_spans",
@@ -27,6 +29,15 @@ class DocxConverter(AbstractConverter):
                 ],
             )
 
+            # Extract first heading as title, then remove it from body
+            soup = BeautifulSoup(html, "html.parser")
+            heading = soup.find(re.compile(r"^h[1-6]$"))
+            if heading:
+                title: str = heading.get_text()
+                heading.decompose()
+            else:
+                title = fallback_title
+
             images = []
             media_path = Path(media_dir)
             if media_path.exists():
@@ -36,7 +47,13 @@ class DocxConverter(AbstractConverter):
                         data = file_path.read_bytes()
                         images.append(Image(media_filename=media_filename, data=data))
 
-            return Article(source_file=src, title=title, body=html, images=images)
+            return Article(
+                source_file=src,
+                title=title,
+                slug=slugify(fallback_title),
+                body=str(soup),
+                images=images,
+            )
         except (OSError, ValueError, RuntimeError) as exc:
             raise RuntimeError(f"conversion of {src.name} failed: {exc}") from exc
         finally:
