@@ -33,6 +33,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov-fail-under=100"
 
 [tool.pymarkdown]
 plugins.md013.enabled = false
