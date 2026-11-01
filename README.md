@@ -33,3 +33,7 @@ make check    # Run all checks
 make ci       # Full CI (lint + tests)
 make fix      # Auto-fix findings
 ```
+
+## Spec-driven development
+
+Features are specified with [OpenSpec](https://openspec.dev) before they are built: proposals, designs, and task lists live in [`openspec/`](openspec/), and agent workflow rules in [`AGENTS.md`](AGENTS.md). The OpenSpec workflow skills are committed to the repo (`.agents/skills/openspec-*/`), and the artifacts are validated in CI with the OpenSpec CLI. To validate locally or (re)generate the skills, install it with `npm install -g @fission-ai/openspec@1.16.0` and run `openspec validate` or `openspec update`.

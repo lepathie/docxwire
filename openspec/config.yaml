@@ -1,0 +1,9 @@
+schema: spec-driven
+
+context: |
+  All OpenSpec artifacts in this repository are public. Write them for an outside engineer: no personal data, or club internals beyond what MOTIVATION.md already states.
+
+operations:
+  archive:
+    guidance:
+      - Before archiving, review every artifact for sensitive content (e.g. PII / personal data) and redact or rewrite it before the move to changes/archive/.

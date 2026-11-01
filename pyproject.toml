@@ -36,6 +36,7 @@ testpaths = ["tests"]
 
 [tool.pymarkdown]
 plugins.md013.enabled = false
+system.exclude_path = ["openspec", ".agents/skills/openspec-*"]
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14"]
