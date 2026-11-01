@@ -53,11 +53,10 @@ class TestDocxConverter:
         assert image is not None
         assert image.media_filename == "media/image1.jpg"
         assert len(image.data) > 0
-        img = parsed_html.find("img")
-        assert img is not None
-        src = img.get("src")
-        assert src is not None
-        assert image.media_filename in src
+        # The single Ruderkurs image sits before the heading, so it is a lead
+        # image: flagged as lead and removed from the body.
+        assert image.is_lead is True
+        assert parsed_html.find("img") is None
 
     @pytest.mark.parametrize(
         "exc",
@@ -87,6 +86,61 @@ class TestDocxConverter:
         article = DocxConverter().convert(ruderkurs_doc)
         assert article.title == "2025.04 Ruderkurs"
         assert article.slug == "ruderkurs-2025-04"
+
+    def test_convert_removes_single_preheading_image_and_marks_it_lead(
+        self, ruderkurs_doc: Path
+    ) -> None:
+        article = DocxConverter().convert(ruderkurs_doc)
+        soup = BeautifulSoup(article.body, "html.parser")
+        assert soup.find("img") is None
+        assert [img.is_lead for img in article.images] == [True]
+
+    def test_convert_removes_all_preheading_images_and_marks_them_lead(
+        self, lichterfest_doc: Path
+    ) -> None:
+        article = DocxConverter().convert(lichterfest_doc)
+        soup = BeautifulSoup(article.body, "html.parser")
+        assert soup.find("img") is None
+        assert [img.is_lead for img in article.images] == [True, True]
+
+    def test_convert_keeps_inbody_images_unmarked_when_lead_present(
+        self, heineken_doc: Path
+    ) -> None:
+        article = DocxConverter().convert(heineken_doc)
+        soup = BeautifulSoup(article.body, "html.parser")
+        assert len(soup.find_all("img")) == 5
+        assert sum(img.is_lead for img in article.images) == 1
+        assert sum(not img.is_lead for img in article.images) == 5
+
+    def test_convert_marks_no_image_lead_without_preheading_image(
+        self, abrudern_doc: Path
+    ) -> None:
+        article = DocxConverter().convert(abrudern_doc)
+        soup = BeautifulSoup(article.body, "html.parser")
+        assert len(soup.find_all("img")) == 2
+        assert all(img.is_lead is False for img in article.images)
+
+    def test_convert_keeps_images_in_body_without_heading(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(return_value="<p>text</p><img src='media/x.jpg'>"),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        soup = BeautifulSoup(article.body, "html.parser")
+        assert soup.find("img") is not None
+        assert all(img.is_lead is False for img in article.images)
+
+    def test_convert_fails_when_lead_image_has_no_matching_media(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(return_value="<img src='media/missing.jpg'><h1>Title</h1>"),
+        )
+        with pytest.raises(RuntimeError):
+            DocxConverter().convert(ruderkurs_doc)
 
 
 class TestSlugify:
