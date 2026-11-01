@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 
 from docxwire.converter.base import AbstractConverter, Article, Image, slugify
 
+_HEADING_RE = re.compile(r"^h[1-6]$")
+
 
 class DocxConverter(AbstractConverter):
     def convert(self, src: Path) -> Article:
@@ -31,14 +33,14 @@ class DocxConverter(AbstractConverter):
 
             # Extract first heading as title, then remove it from body
             soup = BeautifulSoup(html, "html.parser")
-            heading = soup.find(re.compile(r"^h[1-6]$"))
+            heading = soup.find(_HEADING_RE)
             if heading:
                 title: str = heading.get_text()
                 heading.decompose()
             else:
                 title = fallback_title
 
-            images = []
+            images: list[Image] = []
             media_path = Path(media_dir)
             if media_path.exists():
                 for file_path in media_path.glob("**/*"):
