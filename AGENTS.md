@@ -17,3 +17,7 @@ Features are specified before they are built. Every change moves through explore
 ## Definition of done
 
 - `make ci` is green (lint, type check, tests at 100% coverage).
+
+## CodeGraph
+
+- If a `.codegraph/` index exists, prefer `codegraph_explore` (MCP) or `codegraph explore` (shell) over grep/read for locating and understanding code. Without an index, skip CodeGraph entirely — indexing is the user's decision.
