@@ -36,6 +36,7 @@ testpaths = ["tests"]
 addopts = "--cov-fail-under=100"
 
 [tool.pymarkdown]
+extensions.front-matter.enabled = true
 plugins.md013.enabled = false
 system.exclude_path = ["openspec", ".agents/skills/openspec-*"]
 
