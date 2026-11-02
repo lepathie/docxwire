@@ -1,0 +1,41 @@
+name: Commit Lint
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  lint-commits:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Lint commit messages
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.event.after }}
+        run: |
+          if [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            npx -y -p @commitlint/cli@21.2.4 -p @commitlint/config-conventional@21.2.4 commitlint --from "$(git rev-list --max-parents=0 "$PUSH_AFTER")"
+          else
+            npx -y -p @commitlint/cli@21.2.4 -p @commitlint/config-conventional@21.2.4 commitlint --from "$PUSH_BEFORE" --to "$PUSH_AFTER"
+          fi
+
+  lint-pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Lint pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: echo "$PR_TITLE" | npx -y -p @commitlint/cli@21.2.4 -p @commitlint/config-conventional@21.2.4 commitlint

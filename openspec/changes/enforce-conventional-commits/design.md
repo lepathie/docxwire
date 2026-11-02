@@ -30,7 +30,7 @@ npx -y -p @commitlint/cli@21.2.4 -p @commitlint/config-conventional@21.2.4 commi
 ### D3: Lint inputs per event
 
 - **`lint-commits` (push)**: `commitlint --from ${{ github.event.before }} --to ${{ github.event.after }}`. When `before` is all zeros (the push creates the branch), lint from the root commit: `--from $(git rev-list --max-parents=0 ${{ github.event.after }})`. The job uses `actions/checkout` with `fetch-depth: 0` (the history is small; this keeps the range logic uniform).
-- **`lint-pr-title` (pull request)**: `echo "${{ github.event.pull_request.title }}" | commitlint` — one line on stdin, no checkout required.
+- **`lint-pr-title` (pull request)**: `echo "$PR_TITLE" | commitlint` — one line on stdin. A checkout (default depth) is required: without it the workspace contains no `.commitlintrc.json`, and commitlint rejects every title with "Please add rules" (exit 9). The checkout makes both jobs read the same config file — a single source of truth for the rules.
 
 ### D4: No local git hooks
 
