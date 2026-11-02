@@ -3,8 +3,11 @@ from __future__ import annotations
 import re
 import shutil
 import tempfile
+import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import TypeGuard
+from xml.etree import ElementTree
 
 import pypandoc
 from bs4 import BeautifulSoup, Tag
@@ -13,6 +16,9 @@ from docxwire.converter.base import AbstractConverter, Article, Image, slugify
 
 _HEADING_RE = re.compile(r"^h[1-6]$")
 _CAPTION_STYLE = "Bildunterschrift"
+_CORE_CREATED_TAG = "{http://purl.org/dc/terms/}created"
+_AUTOR_STYLE = "Autor"
+_AUTOR_LABEL_RE = re.compile(r"^Autor:\s*")
 
 
 def _top_level_block(el: Tag, root: BeautifulSoup) -> Tag:
@@ -110,6 +116,53 @@ def _flag_lead_images(images: list[Image], lead_srcs: list[str]) -> None:
         )
 
 
+def _read_created_date(src: Path) -> str:
+    """Return the document's creation timestamp (``dcterms:created`` in
+    ``docProps/core.xml``) normalized to ``YYYY-MM-DD HH:MM:SS``, or ``""``
+    when the part or element is absent or unreadable.
+    """
+    try:
+        with zipfile.ZipFile(src) as package, package.open("docProps/core.xml") as part:
+            root = ElementTree.parse(part).getroot()
+    except (
+        OSError,
+        KeyError,
+        ValueError,
+        zipfile.BadZipFile,
+        ElementTree.ParseError,
+    ):
+        return ""
+    created = root.find(_CORE_CREATED_TAG)
+    if created is None or not (text := (created.text or "").strip()):
+        return ""
+    try:
+        return datetime.fromisoformat(text).strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return ""
+
+
+def _extract_author(soup: BeautifulSoup) -> tuple[str, str]:
+    """Return ``(author, note)`` from the ``data-custom-style="Autor"``
+    elements, removing them from *soup*.
+
+    The last element in document order supplies the author; a leading
+    ``Autor:`` label is stripped. *note* flags a missing author (no element,
+    or empty after stripping) or multiple "Autor" lines (last used).
+    """
+    missing = "Author missing: no Autor line in document"
+    elements = soup.find_all(None, attrs={"data-custom-style": _AUTOR_STYLE})
+    if not elements:
+        return "", missing
+    author = _AUTOR_LABEL_RE.sub("", elements[-1].get_text()).strip()
+    for element in elements:
+        element.decompose()
+    if not author:
+        return "", "Author missing: Autor line is empty"
+    if len(elements) > 1:
+        return author, "Multiple Autor lines in document; last one used"
+    return author, ""
+
+
 class DocxConverter(AbstractConverter):
     def convert(self, src: Path) -> Article:
         """Convert a .docx file to an article with raw HTML output."""
@@ -203,13 +256,32 @@ class DocxConverter(AbstractConverter):
             _flag_lead_images(images, lead_srcs)
             _apply_image_captions(images, captions)
 
+            # The "Autor" styled line carries the author: take the last
+            # occurrence, strip an optional "Autor:" label, and remove the
+            # line from the body (after lead processing, so an "Autor"-styled
+            # lead-image paragraph is not mistaken for the byline).
+            author, author_note = _extract_author(soup)
+            created_date = _read_created_date(src)
+            date_note = "" if created_date else "Creation date missing"
+            note = "; ".join(
+                n
+                for n in (
+                    author_note,
+                    date_note,
+                    _guessed_caption_note(images, guessed_srcs),
+                )
+                if n
+            )
+
             return Article(
                 source_file=src,
                 title=title,
                 slug=slugify(fallback_title),
                 body=str(soup),
-                note=_guessed_caption_note(images, guessed_srcs),
+                created_date=created_date,
+                note=note,
                 images=images,
+                created_by_alias=author,
             )
         except (OSError, ValueError, RuntimeError) as exc:
             raise RuntimeError(f"conversion of {src.name} failed: {exc}") from exc

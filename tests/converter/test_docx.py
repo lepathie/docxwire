@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import re
 import tempfile
 from pathlib import Path
@@ -8,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from bs4 import BeautifulSoup
 
+from docxwire.converter import docx as docx_module
 from docxwire.converter.base import Article
 from docxwire.converter.docx import DocxConverter
 
@@ -335,3 +337,163 @@ class TestImageCaptions:
         self, converted_article: Article
     ) -> None:
         assert converted_article.note == ""
+
+
+class TestFixtureMetadata:
+    """Real fixtures: extracted author, creation date, and a clean note."""
+
+    def test_ruderkurs_metadata(self, ruderkurs_doc: Path) -> None:
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.created_by_alias == "Bernhard M."
+        assert article.created_date == "2025-04-26 17:52:00"
+        assert article.note == ""
+
+    def test_lichterfest_metadata(self, lichterfest_doc: Path) -> None:
+        article = DocxConverter().convert(lichterfest_doc)
+        assert article.created_by_alias == "Anjana G."
+        assert article.created_date == "2025-07-06 15:19:00"
+        assert article.note == ""
+
+    def test_heineken_metadata(self, heineken_doc: Path) -> None:
+        # The lead-image paragraph also carries the "Autor" style; the
+        # byline is the last "Autor" line in document order.
+        article = DocxConverter().convert(heineken_doc)
+        assert article.created_by_alias == "Bodo M. / Marbacher Ruderverein"
+        assert article.created_date == "2026-04-26 12:16:00"
+        assert article.note == ""
+
+    def test_abrudern_metadata(self, abrudern_doc: Path) -> None:
+        article = DocxConverter().convert(abrudern_doc)
+        assert article.created_by_alias == "Bernhard M."
+        assert article.created_date == "2026-10-12 08:36:00"
+        assert article.note == ""
+
+
+class TestCreatedDate:
+    @staticmethod
+    def _mock_core_xml(monkeypatch, body: str) -> None:
+        """Patch the zip read so ``docProps/core.xml`` parses to *body*."""
+        core = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<core xmlns:dcterms="http://purl.org/dc/terms/">'
+            f"{body}"
+            "</core>"
+        )
+        zip_mock = MagicMock()
+        zip_mock.return_value.__exit__.return_value = False
+        zip_mock.return_value.__enter__.return_value.open.return_value = io.BytesIO(
+            core.encode("utf-8")
+        )
+        monkeypatch.setattr(docx_module.zipfile, "ZipFile", zip_mock)
+
+    def test_ruderkurs_created_date_from_core_properties(
+        self, converted_article: Article
+    ) -> None:
+        assert converted_article.created_date == "2025-04-26 17:52:00"
+
+    def test_missing_created_timestamp_leaves_field_empty_and_records_note(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        zip_mock = MagicMock()
+        zip_mock.return_value.__exit__.return_value = False
+        zip_mock.return_value.__enter__.return_value.open.side_effect = KeyError(
+            "docProps/core.xml"
+        )
+        monkeypatch.setattr(docx_module.zipfile, "ZipFile", zip_mock)
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.created_date == ""
+        assert "Creation date missing" in article.note
+
+    def test_missing_created_element_leaves_field_empty_and_records_note(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        self._mock_core_xml(
+            monkeypatch,
+            "<dcterms:modified>2025-04-26T17:52:00Z</dcterms:modified>",
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.created_date == ""
+        assert "Creation date missing" in article.note
+
+    def test_unparseable_created_date_leaves_field_empty_and_records_note(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        self._mock_core_xml(
+            monkeypatch, "<dcterms:created>not-a-date</dcterms:created>"
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.created_date == ""
+        assert "Creation date missing" in article.note
+
+
+class TestAuthor:
+    def test_ruderkurs_author_from_autor_line(self, converted_article: Article) -> None:
+        assert converted_article.created_by_alias == "Bernhard M."
+
+    def test_autor_line_removed_from_body(
+        self, converted_article: Article, parsed_html: BeautifulSoup
+    ) -> None:
+        assert parsed_html.find("div", attrs={"data-custom-style": "Autor"}) is None
+        assert "Bernhard M." not in converted_article.body
+
+    def test_autor_label_prefix_is_stripped(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1><p>Fliesstext</p>"
+                    '<div data-custom-style="Autor"><p>Autor: Max M.</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.created_by_alias == "Max M."
+
+    def test_no_autor_line_records_missing_author_in_note(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(return_value="<h1>Titel</h1><p>Fliesstext</p>"),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.created_by_alias == ""
+        assert "Author missing" in article.note
+
+    def test_multiple_autor_lines_use_last_and_flag_anomaly_in_note(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1>"
+                    '<div data-custom-style="Autor"><p>First A.</p></div>'
+                    "<p>Fliesstext</p>"
+                    '<div data-custom-style="Autor"><p>Second B.</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.created_by_alias == "Second B."
+        assert "Multiple" in article.note
+        soup = BeautifulSoup(article.body, "html.parser")
+        assert soup.find("div", attrs={"data-custom-style": "Autor"}) is None
+
+    def test_empty_autor_line_records_missing_author_in_note(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1><p>Fliesstext</p>"
+                    '<div data-custom-style="Autor"><p>Autor:</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.created_by_alias == ""
+        assert "Author missing" in article.note

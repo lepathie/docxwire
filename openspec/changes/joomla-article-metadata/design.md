@@ -42,10 +42,12 @@ Open the `.docx` as a zip, read `docProps/core.xml`, and parse `dcterms:created`
 - *Why:* The user confirmed Joomla expects this format; the transform is a small, lossless reformat of the date-time, and doing it here makes `Article.created_date` directly publishable — the point of this change.
 - *Timezone:* the core `created` is UTC (`Z`); this is a format normalization that preserves the UTC wall-clock. Any site-local conversion is a publisher-boundary concern (non-blocking; can be added where `Article` is consumed).
 
-**5. Author / note semantics (one `note`, distinct messages).**
+**5. Metadata / note semantics (one `note`, distinct messages).**
 - Author found → `created_by_alias = author`; no author-related `note`.
 - No "Autor" line, **or** empty after label stripping → `created_by_alias` left empty; `note` set to a message stating the author is missing.
-- More than one "Autor" line → `created_by_alias = last`; `note` set to a message flagging the anomaly (multiple "Autor" lines found; the last was used). The messages are worded so the two cases are distinguishable.
+- More than one "Autor" line → `created_by_alias = last`; `note` set to a message flagging the anomaly (multiple "Autor" lines found; the last was used). The messages are worded so the cases are distinguishable.
+- No `dcterms:created` (or unreadable) → `created_date` left empty; `note` set to a message stating the creation date is missing.
+- When several issues apply, their messages are joined (semicolon-separated) into the single `note`.
 
 **6. Keep the work inside the converter as private helpers — no separate "metadata" component.**
 Both metadata sources are coupled to the conversion: the author is read from the BeautifulSoup soup that `convert()` already builds, and the creation date requires opening the same source `.docx` (zip) that is being converted. A separate component would have to be handed the soup and the source path (and the `Article`), adding a wiring layer with no reuse boundary to justify it. So the logic stays in `src/docxwire/converter/docx.py` as small private helper functions (e.g. `_read_created_date(src)`, `_extract_author(soup)`) alongside the existing `_flag_lead_images`, keeping `convert()` readable and each helper unit-testable.

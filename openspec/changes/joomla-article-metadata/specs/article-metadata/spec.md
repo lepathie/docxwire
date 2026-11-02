@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how the article converter extracts and attaches article metadata — the author and the creation date — from a `.docx` source during conversion, and how a missing author is surfaced to downstream publishing.
+Defines how the article converter extracts and attaches article metadata — the author and the creation date — from a `.docx` source during conversion, and how a missing author or creation date is surfaced to downstream publishing.
 
 ## ADDED Requirements
 
@@ -60,9 +60,9 @@ The article's creation date SHALL be taken from the source document's creation t
 - **WHEN** the source document has a creation timestamp of 26 April 2025, 17:52:00 UTC
 - **THEN** `Article.created_date` is set to a value representing that timestamp
 
-### Requirement: A missing creation date leaves the field empty
-When the source document has no creation timestamp, `Article.created_date` SHALL be left empty and the conversion SHALL NOT fail.
+### Requirement: A missing creation date is recorded in the note
+When the source document has no creation timestamp, `Article.created_date` SHALL be left empty, the issue SHALL be recorded in `Article.note`, and the conversion SHALL NOT fail.
 
 #### Scenario: No creation timestamp
 - **WHEN** the source document has no creation timestamp
-- **THEN** `Article.created_date` is empty and the conversion succeeds
+- **THEN** `Article.created_date` is empty, `Article.note` records the missing creation date, and the conversion succeeds
