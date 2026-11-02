@@ -15,7 +15,13 @@ def ruderkurs_doc() -> Path:
 
 @pytest.fixture(scope="session")
 def heineken_doc() -> Path:
-    """One image before the heading, five in the body."""
+    """One image before the heading, five in the body.
+
+    The image paragraphs use non-default paragraph styles: the lead image
+    paragraph uses the ``Autor`` style (the same style as the byline at
+    the end of the document), and in-body image paragraphs use the
+    ``Normal (Web)`` style.
+    """
     return DATA_DIR / "2026.03 Heineken Regatta Amsterdam.docx"
 
 
@@ -27,5 +33,10 @@ def abrudern_doc() -> Path:
 
 @pytest.fixture(scope="session")
 def lichterfest_doc() -> Path:
-    """Two images before the heading."""
+    """Two images before the heading.
+
+    The document contains a third image, ``image2.png``, which is used as
+    the fill of a shape rather than as a body image — the body images are
+    ``image1``/``image3``.
+    """
     return DATA_DIR / "2025.07 Heilbronner Lichterfest 2025.docx"

@@ -4,13 +4,89 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
+from typing import TypeGuard
 
 import pypandoc
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from docxwire.converter.base import AbstractConverter, Article, Image, slugify
 
 _HEADING_RE = re.compile(r"^h[1-6]$")
+_CAPTION_STYLE = "Bildunterschrift"
+
+
+def _top_level_block(el: Tag, root: BeautifulSoup) -> Tag:
+    """Return the top-level block *el* sits in (a direct child of *root*)."""
+    node: Tag = el
+    while True:
+        parent = node.parent
+        if not isinstance(parent, Tag) or parent is root:
+            return node
+        node = parent
+
+
+def _next_block_sibling(block: Tag) -> Tag | None:
+    """Return the next top-level sibling block of *block*, skipping the
+    whitespace text nodes pandoc emits between blocks.
+    """
+    sibling = block.next_sibling
+    while sibling is not None and not isinstance(sibling, Tag):
+        sibling = sibling.next_sibling
+    return sibling
+
+
+def _is_caption_candidate(block: Tag | None) -> TypeGuard[Tag]:
+    """True if *block* is a caption line: a non-heading, image-free,
+    paragraph-shaped block (a ``<p>``, or a ``<div>`` wrapping a ``<p>``)
+    with non-empty text.
+    """
+    if not isinstance(block, Tag) or block.name is None:
+        return False
+    if _HEADING_RE.match(block.name) or block.find("img") is not None:
+        return False
+    if not block.get_text(strip=True):
+        return False
+    if block.name == "p":
+        return True
+    children = block.find_all(True, recursive=False)
+    return block.name == "div" and len(children) == 1 and children[0].name == "p"
+
+
+def _apply_image_captions(images: list[Image], captions: dict[str, str]) -> None:
+    """Set caption on each image whose media filename matches a captured
+    caption, keyed by the <img> src (basename match, as in lead flagging).
+    """
+    if not captions:
+        return
+    by_name = {Path(src).name: text for src, text in captions.items()}
+    for image in images:
+        text = by_name.get(Path(image.media_filename).name)
+        if text:
+            image.caption = text
+
+
+def _guessed_caption_note(images: list[Image], guessed_srcs: list[str]) -> str:
+    """Return a one-line note naming images whose caption was captured from a
+    line lacking the Bildunterschrift style, i.e. guessed.
+
+    Images are named by their media filename; the note carries no caption
+    text and no line breaks. Empty when nothing was guessed, or no guessed
+    image has a matching extracted media file.
+    """
+    if not guessed_srcs:
+        return ""
+    by_name = {
+        Path(image.media_filename).name: image.media_filename for image in images
+    }
+    names = [
+        by_name[Path(src).name] for src in guessed_srcs if Path(src).name in by_name
+    ]
+    unique = list(dict.fromkeys(names))
+    return (
+        f"Caption guessed (no {_CAPTION_STYLE} style): {', '.join(unique)}"
+        if unique
+        else ""
+    )
 
 
 def _flag_lead_images(images: list[Image], lead_srcs: list[str]) -> None:
@@ -56,22 +132,64 @@ class DocxConverter(AbstractConverter):
             soup = BeautifulSoup(html, "html.parser")
             heading = soup.find(_HEADING_RE)
             lead_srcs: list[str] = []
+            captions: dict[str, str] = {}
+            guessed_srcs: list[str] = []
             if heading:
                 title: str = heading.get_text()
                 # Images in document order before the first heading are lead
-                # images: record their src and remove them from the body.
+                # images: record their src and remove their top-level block,
+                # plus the caption line below it, from the body.
                 for el in soup.find_all(True):
                     if el is heading:
                         break
+                    if el.parent is None:
+                        continue  # detached by an earlier decompose
                     if el.name == "img":
                         img_src = el.get("src")
-                        if img_src:
-                            lead_srcs.append(str(img_src))
                         # Must stay after the src read: attrs vanish on decompose.
-                        el.decompose()
+                        if img_src:
+                            img_src = str(img_src)
+                            lead_srcs.append(img_src)
+                            block = _top_level_block(el, soup)
+                            caption = _next_block_sibling(block)
+                            if _is_caption_candidate(caption):
+                                captions[img_src] = caption.get_text().strip()
+                                if caption.get("data-custom-style") != _CAPTION_STYLE:
+                                    guessed_srcs.append(img_src)
+                                caption.decompose()
+                            block.decompose()
                 heading.decompose()
             else:
                 title = fallback_title
+
+            # In-body images with a caption line directly below are rewritten
+            # in place as <figure> with a <figcaption>; the caption text is
+            # captured the same way as for lead images.
+            for img in soup.find_all("img"):
+                block = _top_level_block(img, soup)
+                if len(block.find_all("img")) > 1:
+                    # Shared block: left untouched so no image is lost.
+                    continue
+                caption = _next_block_sibling(block)
+                if not _is_caption_candidate(caption):
+                    continue
+                img_src = img.get("src")
+                if not img_src:
+                    continue
+                img_src = str(img_src)
+                styled = caption.get("data-custom-style") == _CAPTION_STYLE
+                text = caption.get_text().strip()
+                figure = soup.new_tag("figure")
+                block.insert_after(figure)
+                figure.append(img.extract())
+                figcaption = soup.new_tag("figcaption")
+                figcaption.string = text
+                figure.append(figcaption)
+                block.decompose()
+                caption.decompose()
+                captions[img_src] = text
+                if not styled:
+                    guessed_srcs.append(img_src)
 
             images: list[Image] = []
             media_path = Path(media_dir)
@@ -83,12 +201,14 @@ class DocxConverter(AbstractConverter):
                         images.append(Image(media_filename=media_filename, data=data))
 
             _flag_lead_images(images, lead_srcs)
+            _apply_image_captions(images, captions)
 
             return Article(
                 source_file=src,
                 title=title,
                 slug=slugify(fallback_title),
                 body=str(soup),
+                note=_guessed_caption_note(images, guessed_srcs),
                 images=images,
             )
         except (OSError, ValueError, RuntimeError) as exc:
