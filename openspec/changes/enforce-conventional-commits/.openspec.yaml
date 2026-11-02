@@ -1,0 +1,7 @@
+schema: spec-driven
+created: 2026-11-01
+goal: Enforce Conventional Commits with commitlint in CI and document the convention
+affected_areas:
+  - ci
+  - docs
+skip_specs: true
