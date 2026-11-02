@@ -11,7 +11,7 @@ test:
 # Run all checks
 .PHONY: check
 check:
-	uv run ty check src/
+	uv run ty check .
 	uv run ruff check .
 	uv run ruff format --check .
 	uv run pymarkdown scan -r --respect-gitignore .
