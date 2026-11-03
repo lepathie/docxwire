@@ -1,0 +1,10 @@
+# Joomla publishing settings.
+#
+# Copy to `settings.toml` and fill in real values.
+#   cp settings.toml.example settings.toml
+
+[joomla]
+base_url = "https://your-site.example"
+base_path = "/index.php/api/index.php"
+token = "replace-with-your-api-token"
+default_catid = 0

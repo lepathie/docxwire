@@ -30,3 +30,6 @@ __pycache__/
 # Coverage / Test artifacts
 .coverage
 htmlcov/
+
+# Custom settings
+settings.toml
