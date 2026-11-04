@@ -7,7 +7,7 @@ Defines the behavior of DOCxWIRE's thin client for the Joomla 5 REST content API
 ## ADDED Requirements
 
 ### Requirement: The client is configured from Joomla settings
-The client SHALL be constructed from the validated Joomla settings (base URL, base path, API token, default category) and SHALL address the article endpoint as `<base_url><base_path>/content/articles`.
+The client SHALL be constructed from the validated Joomla settings (base URL, base path, API token, default category) and SHALL address the article endpoint as `<base_url><base_path>/content/articles`. Every request SHALL carry `Accept: application/vnd.api+json` (the API answers 406 without a matching Accept header), and create/update requests SHALL send their payload as a flat JSON object body with `Content-Type: application/json` (the API does not parse JSON:API-shaped write bodies).
 
 #### Scenario: Endpoint is composed from settings
 - **WHEN** the client is created with a base URL and base path
@@ -16,6 +16,14 @@ The client SHALL be constructed from the validated Joomla settings (base URL, ba
 #### Scenario: Token is sent on every request
 - **WHEN** the client performs any article request
 - **THEN** the request carries the API token in the `X-Joomla-Token` header
+
+#### Scenario: Accept header is sent on every request
+- **WHEN** the client performs any article request
+- **THEN** the request carries `Accept: application/vnd.api+json`
+
+#### Scenario: Write bodies are flat JSON
+- **WHEN** an article is created or updated
+- **THEN** the request body is the flat payload object encoded as JSON with `Content-Type: application/json`
 
 ### Requirement: The client exposes the full article CRUD surface
 The client SHALL support listing articles, getting one article by ID, creating an article, updating an article by ID, and deleting an article by ID, and SHALL return the API's JSON data for each operation.
@@ -38,7 +46,7 @@ The client SHALL support listing articles, getting one article by ID, creating a
 
 #### Scenario: Deleting an article
 - **WHEN** an article is deleted by ID
-- **THEN** a subsequent get of that ID fails as not found
+- **THEN** the DELETE request is sent and the API's response is surfaced (the verified site answers 204 with an empty body; on a live article the DELETE is a no-op — the client's `delete_article` documents the two-step removal)
 
 ### Requirement: Listing passes through API filters and ordering
 List requests SHALL accept the content API's filter and ordering query parameters (such as `filter[category]`, `filter[state]`, `filter[search]`, `list[ordering]`, `list[direction]`) and SHALL forward them to the API without transforming them.
@@ -63,7 +71,7 @@ The mapping from a converted article to a create payload SHALL set `title` from 
 - **THEN** the payload's `catid` is the settings' default category
 
 ### Requirement: The article body goes into a single body field
-The mapping SHALL send the entire article body in a single body field: the whole body in `introtext` and an empty `fulltext`, so that no read-more split is implied. The deprecated `articletext` field SHALL NOT be used. The body field name SHALL be the one verified against the live API (see the change's design).
+The mapping SHALL send the entire article body in a single body field: the whole body in `introtext` and an empty `fulltext`, so that no read-more split is implied. The deprecated `articletext` field SHALL NOT be used. Live verification confirmed `introtext` is accepted on create and persists; the API exposes the stored body as the `text` attribute on read.
 
 #### Scenario: Body is placed in the single body field
 - **WHEN** a payload is built for an article with a non-empty body
@@ -74,7 +82,7 @@ The mapping SHALL send the entire article body in a single body field: the whole
 - **THEN** the payload does not contain an `articletext` field
 
 ### Requirement: Article metadata is carried into the payload
-The mapping SHALL carry the article's author alias (`created_by_alias`), metadata description (`metadesc`), metadata keywords (`metakey`), and creation date (`created`) into the create payload.
+The mapping SHALL carry the article's author alias (`created_by_alias`), metadata description (`metadesc`), metadata keywords (`metakey`), and creation date (`created`) into the create payload, and SHALL set a `language` (the target site rejects creates without one; how that value is resolved is a separate concern).
 
 #### Scenario: Author is carried
 - **WHEN** a payload is built for an article with an extracted author
