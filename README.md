@@ -46,3 +46,14 @@ Features are specified with [OpenSpec](https://openspec.dev) before they are bui
 ## Conventional Commits
 
 This project adheres to [Conventional Commits](https://www.conventionalcommits.org/). The `Commit Lint` CI workflow validates commit messages with [commitlint](https://commitlint.js.org/) using the `@commitlint/config-conventional` preset (see [`.commitlintrc.json`](.commitlintrc.json)): it checks the commit landing on `main` and, before a merge, the pull request title. Pull requests are squash-merged, with the title serving as the commit message.
+
+## Dependency updates
+
+[Renovate](https://docs.renovatebot.com/) keeps the dependencies current: the `uv` (`pyproject.toml` + `uv.lock`) and `npm` (`package.json` + `package-lock.json`) ecosystems, the GitHub Actions in the CI workflows, and the pinned Python version (`.python-version`). The full policy lives in [`renovate.json`](renovate.json):
+
+- **Automerged** (gated on the CI status checks required on `main`): `patch` updates, and `minor`/`patch` updates of dev-only dependencies — in both cases only from a `1.0`+ current version.
+- **Stays manual** (opens a PR for a human): `major` updates (one PR per major, sequenced), all updates of `0.x` dependencies, and `minor` updates of runtime dependencies.
+- **7-day cooldown**: the bot ignores versions released less than 7 days ago (supply-chain cooldown); security updates are not delayed.
+- **Weekly lockfile maintenance** refreshes transitive dependencies in `uv.lock` and `package-lock.json` and may automerge.
+
+To request an update outside the normal schedule, or to override the policy for a single dependency, use the Renovate dashboard (re-run the branch) — or open a PR bumping the manifest yourself.

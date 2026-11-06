@@ -6,7 +6,7 @@ Dependency updates are currently manual (`uv lock --upgrade`, `npm install`), wi
 
 ## What Changes
 
-- Add a `renovate.json` at the repository root configuring the Renovate bot for the two ecosystems in use: `uv` (`pyproject.toml` + `uv.lock`) and `npm` (`package.json` + `package-lock.json`).
+- Add a `renovate.json` at the repository root configuring the Renovate bot for the `uv` (`pyproject.toml` + `uv.lock`) and `npm` (`package.json` + `package-lock.json`) ecosystems, plus the GitHub Actions in the CI workflows and the pinned Python version (`.python-version`).
 - Define the update policy in that config:
   - 7-day minimum release age for version updates (supply-chain cooldown); security updates are not delayed.
   - Automerge for `patch` updates and for `minor`/`patch` of dev-only dependencies, gated on passing CI status checks; `0.x` versions are excluded from automerge.

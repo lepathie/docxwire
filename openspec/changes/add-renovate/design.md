@@ -40,7 +40,7 @@ See proposal.md for motivation. Constraints that shape the approach:
 - `packageRules`, in order (later matches override earlier):
   1. `{ matchUpdateTypes: ["patch"], matchCurrentVersion: "!/^0/", automerge: true, platformAutomerge: true }`
   2. `{ matchDepTypes: ["devDependencies", "dev"], matchUpdateTypes: ["minor", "patch"], matchCurrentVersion: "!/^0/", automerge: true, platformAutomerge: true }`
-  3. majors get no automerge (the default), enforced to be one PR per major via `separateMultipleMajorReleases: true` at the top level.
+  3. majors get no automerge (the default), enforced to be one PR per major via `separateMultipleMajor: true` at the top level.
 - `platformAutomerge: true` uses the platform's native auto-merge, which honors the repository's required-status-check branch protection — the gate is enforced by GitHub, not by the bot's word.
 
 **3. Ecosystem coverage.** Renovate auto-detects both `uv` (from `uv.lock`) and `npm` (from `package-lock.json`) managers from the files at the repo root; no `managerFilePatterns` needed. The uv manager updates `pyproject.toml` constraints and `uv.lock` in the same PR.
