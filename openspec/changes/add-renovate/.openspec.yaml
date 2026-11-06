@@ -1,0 +1,7 @@
+schema: spec-driven
+created: 2026-11-06
+goal: Automate dependency updates with Renovate for the uv and npm ecosystems
+affected_areas:
+  - ci
+  - docs
+skip_specs: true
