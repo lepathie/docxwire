@@ -19,7 +19,8 @@ flowchart LR
 
 ## Getting started
 
-This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+This project uses [uv](https://docs.astral.sh/uv/) for Python dependency management and
+[Node.js 22](https://nodejs.org/) (with npm) for the JavaScript tooling (OpenSpec CLI, commitlint).
 
 To set up your environment, run:
 
@@ -30,15 +31,17 @@ make setup   # Setup environment
 [Make](https://www.gnu.org/software/make/) serves as the task runner for code quality and testing. Available targets:
 
 ```bash
-make test     # Run test suite with coverage
-make check    # Run all checks
-make ci       # Full CI (lint + tests)
-make fix      # Auto-fix findings
+make test              # Run test suite with coverage
+make check             # Run all checks
+make ci                # Full CI (lint + tests)
+make fix               # Auto-fix findings
+make lint-commit       # Validate a commit message (piped via stdin)
+make openspec-validate # Validate OpenSpec artifacts
 ```
 
 ## Spec-driven development
 
-Features are specified with [OpenSpec](https://openspec.dev) before they are built: proposals, designs, and task lists live in [`openspec/`](openspec/), and agent workflow rules in [`AGENTS.md`](AGENTS.md). The OpenSpec workflow skills are committed to the repo (`.agents/skills/openspec-*/`), and the artifacts are validated in CI with the OpenSpec CLI. To validate locally or (re)generate the skills, install it with `npm install -g @fission-ai/openspec@1.16.0` and run `openspec validate` or `openspec update`.
+Features are specified with [OpenSpec](https://openspec.dev) before they are built: proposals, designs, and task lists live in [`openspec/`](openspec/), and agent workflow rules in [`AGENTS.md`](AGENTS.md). The OpenSpec workflow skills are committed to the repo (`.agents/skills/openspec-*/`), and the artifacts are validated in CI with the OpenSpec CLI. The CLI version is declared in [`package.json`](package.json) and installed by `make setup`; validate locally with `make openspec-validate`. If you want the bare `openspec` command on your `PATH` (e.g. to (re)generate the workflow skills with `openspec update`), optionally install the pinned version globally with `npm install -g @fission-ai/openspec@<version from package.json>`.
 
 ## Conventional Commits
 

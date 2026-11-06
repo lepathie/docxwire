@@ -17,15 +17,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Lint commit messages
         env:
           PUSH_BEFORE: ${{ github.event.before }}
           PUSH_AFTER: ${{ github.event.after }}
         run: |
           if [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            npx -y -p @commitlint/cli@21.2.4 -p @commitlint/config-conventional@21.2.4 commitlint --from "$(git rev-list --max-parents=0 "$PUSH_AFTER")"
+            ./node_modules/.bin/commitlint --from "$(git rev-list --max-parents=0 "$PUSH_AFTER")"
           else
-            npx -y -p @commitlint/cli@21.2.4 -p @commitlint/config-conventional@21.2.4 commitlint --from "$PUSH_BEFORE" --to "$PUSH_AFTER"
+            ./node_modules/.bin/commitlint --from "$PUSH_BEFORE" --to "$PUSH_AFTER"
           fi
 
   lint-pr-title:
@@ -35,7 +43,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Lint pull request title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: echo "$PR_TITLE" | npx -y -p @commitlint/cli@21.2.4 -p @commitlint/config-conventional@21.2.4 commitlint
+        run: echo "$PR_TITLE" | ./node_modules/.bin/commitlint

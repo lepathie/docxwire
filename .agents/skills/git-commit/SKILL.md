@@ -19,7 +19,7 @@ compatibility: Requires git.
    Before committing, pipe the drafted message into below command run from the repository root to validate it.
 
    ```sh
-   npx -y -p @commitlint/cli@21.2.4 -p @commitlint/config-conventional@21.2.4 commitlint
+   make lint-commit
    ```
 
-   After committing, append `-l` and fix via `git commit --amend` until it exits 0.
+   After committing, run `make lint-commit ARGS=-l` and fix via `git commit --amend` until it exits 0.

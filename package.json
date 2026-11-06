@@ -1,0 +1,12 @@
+{
+  "name": "docxwire",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "@fission-ai/openspec": "1.16.0"
+  }
+}
