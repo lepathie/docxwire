@@ -3,9 +3,6 @@ name: Commit Lint
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
-    types: [opened, edited, reopened, synchronize]
 
 jobs:
   lint-commits:
@@ -35,23 +32,3 @@ jobs:
           else
             ./node_modules/.bin/commitlint --from "$PUSH_BEFORE" --to "$PUSH_AFTER"
           fi
-
-  lint-pr-title:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint pull request title
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: echo "$PR_TITLE" | ./node_modules/.bin/commitlint

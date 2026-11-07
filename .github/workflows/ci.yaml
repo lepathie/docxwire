@@ -3,8 +3,12 @@ name: CI Pipeline
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      pr_title:
+        description: "PR title to lint (set by the auto-regenerate workflow)"
+        required: false
+        type: string
 
 jobs:
   lint-and-test:
@@ -39,3 +43,27 @@ jobs:
 
       - name: Validate OpenSpec artifacts
         run: ./node_modules/.bin/openspec validate --all
+
+      - name: Check generated OpenSpec files are in sync
+        run: |
+          test "$(./node_modules/.bin/openspec update --dry-run --json | jq '.changes | length')" -eq 0
+
+  lint-pr-title:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.pr_title != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint pull request title
+        env:
+          PR_TITLE: ${{ github.event.inputs.pr_title }}
+        run: echo "$PR_TITLE" | ./node_modules/.bin/commitlint
