@@ -511,6 +511,43 @@ class TestNote:
         assert "\n" not in article.note
 
 
+class TestTitleItem:
+    def test_no_heading_contributes_title_item(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        # No heading: the title falls back to the source file name and the
+        # note carries the Titel item (the "Autor" line is present and the
+        # creation date is read from the real document).
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<p>no headings here</p>"
+                    '<div data-custom-style="Autor"><p>Autor: Max M.</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.title == "2025.04 Ruderkurs"
+        assert article.note == "Prüfe: Titel"
+
+    def test_present_heading_contributes_no_title_item(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1><p>Fliesstext</p>"
+                    '<div data-custom-style="Autor"><p>Autor: Max M.</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.title == "Titel"
+        assert "Titel" not in article.note
+
+
 class TestFixtureMetadata:
     """Real fixtures: extracted author, creation date, and a clean note."""
 

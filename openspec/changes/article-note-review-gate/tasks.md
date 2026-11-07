@@ -26,9 +26,9 @@ integration/CI); **commit 2** = group 5 (title-fallback item).
 
 ## 5. Title fallback item (commit 2)
 
-- [ ] 5.1 When the document has no heading (title falls back to the source file name), contribute the `Titel` item. Verify: a failing test (no heading → note includes `Titel`) passes after the change.
-- [ ] 5.2 When a heading is present, contribute no `Titel` item. Verify: a test asserting no `Titel` item for a headed document passes.
-- [ ] 5.3 Run `make ci` (lint, type check, tests at 100% coverage). Verify: `make ci` exits 0.
+- [x] 5.1 When the document has no heading (title falls back to the source file name), contribute the `Titel` item. Verify: a failing test (no heading → note includes `Titel`) passes after the change.
+- [x] 5.2 When a heading is present, contribute no `Titel` item. Verify: a test asserting no `Titel` item for a headed document passes.
+- [x] 5.3 Run `make ci` (lint, type check, tests at 100% coverage). Verify: `make ci` exits 0.
 
 ## Workflow follow-up
 

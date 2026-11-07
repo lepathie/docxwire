@@ -285,7 +285,10 @@ class DocxConverter(AbstractConverter):
                             block.decompose()
                 heading.decompose()
             else:
+                # No heading: the title fell back to the source file name,
+                # which the publisher must verify.
                 title = fallback_title
+                note_builder.add(NoteItem.TITLE)
 
             # In-body images with a caption line directly below are rewritten
             # in place as <figure> with a <figcaption>; the caption text is
