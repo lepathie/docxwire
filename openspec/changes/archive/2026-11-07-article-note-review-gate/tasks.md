@@ -32,5 +32,6 @@ integration/CI); **commit 2** = group 5 (title-fallback item).
 
 ## Workflow follow-up
 
-- Archive the change (`openspec archive`) once `make ci` is green and the publisher-UI rollout is confirmed; this moves it to `changes/archive/` and syncs the delta specs into `openspec/specs/`.
+- Publisher-UI verification is deferred to the pipeline-orchestration work: staging access is gated behind HTTP basic auth, so a manual publish was not worth it pre-orchestration. The change is archived with `make ci` green; confirm the note rendering in the publisher UI when the first orchestrated publish lands.
+- Archive the change (`openspec archive`); this moves it to `changes/archive/` and syncs the delta specs into `openspec/specs/`.
 - Verify the archived result (main specs updated, change no longer in the active list).

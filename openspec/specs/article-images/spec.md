@@ -78,20 +78,20 @@ The caption of an image — the line of text directly below it, usually carrying
 - **THEN** the image's `caption` field remains empty
 
 ### Requirement: Guessed captions are flagged in the article note
-When a captured caption line does not carry the `Bildunterschrift` paragraph style, the converter is guessing what the caption is. The article's `note` field SHALL then flag this concisely: a single short line naming each affected image by its media filename and stating that its caption was captured without the `Bildunterschrift` style. The note SHALL NOT contain the caption text or line breaks.
+When a captured caption line does not carry the `Bildunterschrift` paragraph style, the converter is guessing what the caption is. The note SHALL then reference each affected image positionally — an in-body image by its document-order ordinal and a lead image by its lead-slot label — instead of by its media filename. The note SHALL NOT contain the caption text or line breaks.
 
 #### Scenario: In-body guessed caption is flagged
 - **WHEN** an in-body image's caption line does not carry the `Bildunterschrift` style
-- **THEN** the caption is captured and the article's `note` is a single concise line naming the image by its media filename
+- **THEN** the caption is captured and the note references the image by its in-body ordinal
 
 #### Scenario: Lead guessed caption is flagged
 - **WHEN** a leading image's caption line does not carry the `Bildunterschrift` style
-- **THEN** the caption is captured and the article's `note` names the image by its media filename
+- **THEN** the caption is captured and the note references the image by its lead-slot label
 
 #### Scenario: Multiple guessed captions share one concise line
 - **WHEN** two images have caption lines without the `Bildunterschrift` style
-- **THEN** the article's `note` names both images in a single line without line breaks
+- **THEN** the note references both images positionally in a single line without line breaks
 
 #### Scenario: Styled caption is not flagged
 - **WHEN** a captured caption line carries the `Bildunterschrift` style
-- **THEN** the article's `note` is not modified for that image
+- **THEN** the note is not modified for that image
