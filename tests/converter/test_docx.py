@@ -43,6 +43,26 @@ def pandoc_media_x(monkeypatch) -> None:
     monkeypatch.setattr(tempfile, "mkdtemp", mkdtemp_with_x)
 
 
+@pytest.fixture
+def pandoc_media_xyz(monkeypatch) -> None:
+    """Point pypandoc's extract-media dir at one containing media/{x,y,z}.jpg."""
+    real_mkdtemp = tempfile.mkdtemp
+
+    def mkdtemp_with_xyz(
+        suffix: str | None = None,
+        prefix: str | None = None,
+        dir: str | None = None,
+    ) -> str:
+        media_dir = real_mkdtemp(suffix=suffix, prefix=prefix, dir=dir)
+        media = Path(media_dir) / "media"
+        media.mkdir()
+        for name in ("x.jpg", "y.jpg", "z.jpg"):
+            (media / name).write_bytes(b"\xff\xd8\x8egallery-placeholder")
+        return media_dir
+
+    monkeypatch.setattr(tempfile, "mkdtemp", mkdtemp_with_xyz)
+
+
 class TestDocxConverter:
     def test_populates_required_fields(
         self, converted_article: Article, ruderkurs_doc: Path
@@ -156,6 +176,50 @@ class TestLeadImages:
         )
         with pytest.raises(RuntimeError):
             DocxConverter().convert(ruderkurs_doc)
+
+
+class TestImageOrdering:
+    def test_orders_images_by_document_position(
+        self, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        # Media files exist in a different (filesystem) order than the
+        # document: c.jpg is the lead, a.jpg and b.jpg are in-body, and
+        # d.jpg is extracted but never referenced.
+        real_mkdtemp = tempfile.mkdtemp
+
+        def mkdtemp_with_media(
+            suffix: str | None = None,
+            prefix: str | None = None,
+            dir: str | None = None,
+        ) -> str:
+            media_dir = real_mkdtemp(suffix=suffix, prefix=prefix, dir=dir)
+            media = Path(media_dir) / "media"
+            media.mkdir()
+            for name in ("a.jpg", "b.jpg", "c.jpg", "d.jpg"):
+                (media / name).write_bytes(b"\xff\xd8\x8egallery-placeholder")
+            return media_dir
+
+        monkeypatch.setattr(tempfile, "mkdtemp", mkdtemp_with_media)
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<p><img src='media/c.jpg'></p>"
+                    "<p>Leitbild</p>"
+                    "<h1>Titel</h1>"
+                    "<p><img src='media/a.jpg'></p>"
+                    "<p><img src='media/b.jpg'></p>"
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert [img.media_filename for img in article.images] == [
+            "media/c.jpg",
+            "media/a.jpg",
+            "media/b.jpg",
+            "media/d.jpg",
+        ]
+        assert [img.is_lead for img in article.images] == [True, False, False, False]
 
 
 class TestImageCaptions:
@@ -313,7 +377,7 @@ class TestImageCaptions:
         self, pandoc_media_x, monkeypatch, ruderkurs_doc: Path
     ) -> None:
         # x.jpg matches extracted media; missing.jpg has no extracted media
-        # file, so the note can only name x.jpg.
+        # file, so only x.jpg's in-body ordinal is referenced.
         monkeypatch.setattr(
             "pypandoc.convert_file",
             MagicMock(
@@ -322,21 +386,129 @@ class TestImageCaptions:
                     "<p>Geheimtext der Beispielunterschrift</p>"
                     "<p><img src='media/missing.jpg'></p>"
                     "<p>Waisenunterschrift</p>"
+                    '<div data-custom-style="Autor"><p>Autor: Max M.</p></div>'
                 )
             ),
         )
         article = DocxConverter().convert(ruderkurs_doc)
-        assert article.note
-        assert "media/x.jpg" in article.note
+        assert article.note == "Prüfe: 1. Bild"
         assert "missing.jpg" not in article.note
         assert "\n" not in article.note
         assert "Geheimtext" not in article.note
         assert "Waisenunterschrift" not in article.note
 
+    def test_two_guessed_inbody_images_condensed_to_shared_ordinal(
+        self, pandoc_media_xyz, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1>"
+                    "<p><img src='media/x.jpg'></p><p>Unterschrift x</p>"
+                    "<p><img src='media/y.jpg'></p><p>Unterschrift y</p>"
+                    '<div data-custom-style="Autor"><p>Autor: Max M.</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.note == "Prüfe: 1. & 2. Bild"
+
+    def test_three_guessed_inbody_images_condensed_to_shared_ordinal(
+        self, pandoc_media_xyz, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1>"
+                    "<p><img src='media/x.jpg'></p><p>Unterschrift x</p>"
+                    "<p><img src='media/y.jpg'></p><p>Unterschrift y</p>"
+                    "<p><img src='media/z.jpg'></p><p>Unterschrift z</p>"
+                    '<div data-custom-style="Autor"><p>Autor: Max M.</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.note == "Prüfe: 1., 2. & 3. Bild"
+
+    def test_noncontiguous_guessed_inbody_images_keep_their_ordinals(
+        self, pandoc_media_xyz, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        # y.jpg's caption carries the Bildunterschrift style, so only the
+        # first and third in-body images are guessed.
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1>"
+                    "<p><img src='media/x.jpg'></p><p>Unterschrift x</p>"
+                    "<p><img src='media/y.jpg'></p>"
+                    "<p data-custom-style='Bildunterschrift'>Stilisierte y</p>"
+                    "<p><img src='media/z.jpg'></p><p>Unterschrift z</p>"
+                    '<div data-custom-style="Autor"><p>Autor: Max M.</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.note == "Prüfe: 1. & 3. Bild"
+
+    def test_lead_guessed_caption_referenced_by_placeholder_label(
+        self, pandoc_media_x, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        # A pre-heading (lead) image with a plain caption line is guessed
+        # and referenced by the generic lead-slot placeholder, not by its
+        # media filename.
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<p><img src='media/x.jpg'></p>"
+                    "<p>Ein Beispielbild ohne Bildunterschrift-Stil</p>"
+                    "<h1>Titel</h1><p>Fliesstext</p>"
+                    '<div data-custom-style="Autor"><p>Autor: Max M.</p></div>'
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.note == "Prüfe: Titelbild"
+        assert "x.jpg" not in article.note
+
     def test_styled_caption_line_not_flagged_in_note(
         self, converted_article: Article
     ) -> None:
         assert converted_article.note == ""
+
+
+class TestNote:
+    """End-to-end note behavior: empty when clean, one Prüfe: line when not."""
+
+    def test_clean_document_yields_empty_note(self, converted_article: Article) -> None:
+        assert converted_article.note == ""
+
+    def test_document_with_several_issues_yields_one_pruefe_line(
+        self, pandoc_media_x, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        # No "Autor" line, no creation timestamp, and one guessed in-body
+        # image: a single Prüfe: line in the fixed item order, no line
+        # breaks.
+        zip_mock = MagicMock()
+        zip_mock.return_value.__exit__.return_value = False
+        zip_mock.return_value.__enter__.return_value.open.side_effect = KeyError(
+            "docProps/core.xml"
+        )
+        monkeypatch.setattr(docx_module.zipfile, "ZipFile", zip_mock)
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1><p><img src='media/x.jpg'></p><p>Geheimtext</p>"
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        assert article.note == "Prüfe: Autor, Erstellungsdatum, 1. Bild"
+        assert "\n" not in article.note
 
 
 class TestFixtureMetadata:
@@ -402,7 +574,7 @@ class TestCreatedDate:
         monkeypatch.setattr(docx_module.zipfile, "ZipFile", zip_mock)
         article = DocxConverter().convert(ruderkurs_doc)
         assert article.created_date == ""
-        assert "Creation date missing" in article.note
+        assert article.note == "Prüfe: Erstellungsdatum"
 
     def test_missing_created_element_leaves_field_empty_and_records_note(
         self, monkeypatch, ruderkurs_doc: Path
@@ -413,7 +585,7 @@ class TestCreatedDate:
         )
         article = DocxConverter().convert(ruderkurs_doc)
         assert article.created_date == ""
-        assert "Creation date missing" in article.note
+        assert article.note == "Prüfe: Erstellungsdatum"
 
     def test_unparseable_created_date_leaves_field_empty_and_records_note(
         self, monkeypatch, ruderkurs_doc: Path
@@ -423,7 +595,7 @@ class TestCreatedDate:
         )
         article = DocxConverter().convert(ruderkurs_doc)
         assert article.created_date == ""
-        assert "Creation date missing" in article.note
+        assert article.note == "Prüfe: Erstellungsdatum"
 
 
 class TestAuthor:
@@ -460,7 +632,7 @@ class TestAuthor:
         )
         article = DocxConverter().convert(ruderkurs_doc)
         assert article.created_by_alias == ""
-        assert "Author missing" in article.note
+        assert article.note == "Prüfe: Autor"
 
     def test_multiple_autor_lines_use_last_and_flag_anomaly_in_note(
         self, monkeypatch, ruderkurs_doc: Path
@@ -478,7 +650,7 @@ class TestAuthor:
         )
         article = DocxConverter().convert(ruderkurs_doc)
         assert article.created_by_alias == "Second B."
-        assert "Multiple" in article.note
+        assert article.note == "Prüfe: Autor"
         soup = BeautifulSoup(article.body, "html.parser")
         assert soup.find("div", attrs={"data-custom-style": "Autor"}) is None
 
@@ -496,4 +668,4 @@ class TestAuthor:
         )
         article = DocxConverter().convert(ruderkurs_doc)
         assert article.created_by_alias == ""
-        assert "Author missing" in article.note
+        assert article.note == "Prüfe: Autor"

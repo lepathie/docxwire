@@ -35,8 +35,9 @@ list[Issue]` (rejected — over-engineered for a one-line human field); keeping 
 helpers (rejected — see 2).
 
 **2. One internal note builder replaces the three note sources + the ad-hoc join.**
-A small collector (e.g. a `NoteBuilder` with `.add(item)` and `.build() -> str`) is called
-from `convert()`. It de-duplicates items, orders them by a fixed sequence, and renders
+A small collector (a `NoteBuilder` with `.add(NoteItem)` for the fixed metadata vocabulary,
+`.add_image_ref(str)` for positional/role-based image references, and `.build() -> str`) is
+called from `convert()`. It de-duplicates items, orders them by a fixed sequence, and renders
 `Prüfe: <a>, <b>, …` (empty when nothing was added). `_extract_author`, the inline
 `date_note`, and `_guessed_caption_note` stop returning free-form note strings; they report
 *which condition held* and the builder maps it to the item label. This removes the coupled

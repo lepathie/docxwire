@@ -12,7 +12,14 @@ from xml.etree import ElementTree
 import pypandoc
 from bs4 import BeautifulSoup, Tag
 
-from docxwire.converter.base import AbstractConverter, Article, Image, slugify
+from docxwire.converter.base import (
+    AbstractConverter,
+    Article,
+    Image,
+    NoteBuilder,
+    NoteItem,
+    slugify,
+)
 
 _HEADING_RE = re.compile(r"^h[1-6]$")
 _CAPTION_STYLE = "Bildunterschrift"
@@ -71,28 +78,70 @@ def _apply_image_captions(images: list[Image], captions: dict[str, str]) -> None
             image.caption = text
 
 
-def _guessed_caption_note(images: list[Image], guessed_srcs: list[str]) -> str:
-    """Return a one-line note naming images whose caption was captured from a
+# Generic placeholder for lead images while lead-slot assignment does not
+# exist yet; the single swap point when it lands.
+_LEAD_SLOT_LABEL = "Titelbild"
+
+
+def _lead_label(image: Image) -> str:
+    """Return the lead-slot label the note uses to reference *image*.
+
+    While lead-slot assignment does not exist, every lead image shares one
+    generic placeholder label.
+    """
+    return _LEAD_SLOT_LABEL
+
+
+def _inbody_ordinals(images: list[Image]) -> dict[str, int]:
+    """Map media-file basenames to 1-based ordinals among in-body (non-lead)
+    images, in list (document) order.
+    """
+    ordinals: dict[str, int] = {}
+    position = 0
+    for image in images:
+        if image.is_lead:
+            continue
+        position += 1
+        ordinals[Path(image.media_filename).name] = position
+    return ordinals
+
+
+def _condensed_ordinals(ordinals: list[int]) -> str:
+    """Render 1-based *ordinals* condensed to one shared ``Bild``: numbers
+    ascending, joined with `, ` and `& ` before the last
+    (``1. & 2. Bild``, ``1., 2. & 3. Bild``).
+    """
+    numbers = [f"{n}." for n in sorted(set(ordinals))]
+    if len(numbers) == 1:
+        return f"{numbers[0]} Bild"
+    return f"{', '.join(numbers[:-1])} & {numbers[-1]} Bild"
+
+
+def _guessed_caption_items(images: list[Image], guessed_srcs: list[str]) -> list[str]:
+    """Return the note items for images whose caption was captured from a
     line lacking the Bildunterschrift style, i.e. guessed.
 
-    Images are named by their media filename; the note carries no caption
-    text and no line breaks. Empty when nothing was guessed, or no guessed
-    image has a matching extracted media file.
+    In-body images are referenced by a condensed in-body ordinal; lead
+    images by their lead-slot label. Images without a matching extracted
+    media file are ignored.
     """
     if not guessed_srcs:
-        return ""
-    by_name = {
-        Path(image.media_filename).name: image.media_filename for image in images
-    }
-    names = [
-        by_name[Path(src).name] for src in guessed_srcs if Path(src).name in by_name
-    ]
-    unique = list(dict.fromkeys(names))
-    return (
-        f"Caption guessed (no {_CAPTION_STYLE} style): {', '.join(unique)}"
-        if unique
-        else ""
-    )
+        return []
+    by_name = {Path(image.media_filename).name: image for image in images}
+    ordinals = _inbody_ordinals(images)
+    items: list[str] = []
+    body_ordinals: list[int] = []
+    for src in guessed_srcs:
+        image = by_name.get(Path(src).name)
+        if image is None:
+            continue
+        if image.is_lead:
+            items.append(_lead_label(image))
+        else:
+            body_ordinals.append(ordinals[Path(src).name])
+    if body_ordinals:
+        items.append(_condensed_ordinals(body_ordinals))
+    return items
 
 
 def _flag_lead_images(images: list[Image], lead_srcs: list[str]) -> None:
@@ -114,6 +163,28 @@ def _flag_lead_images(images: list[Image], lead_srcs: list[str]) -> None:
         raise ValueError(
             f"lead image has no matching extracted media file: {', '.join(sorted(unmatched))}"
         )
+
+
+def _order_images(
+    images: list[Image], lead_srcs: list[str], body_srcs: list[str]
+) -> list[Image]:
+    """Return *images* ordered by document position: lead images in
+    encounter order, then in-body images in body order, then any
+    unreferenced extracted media in their original order.
+    """
+    by_name = {Path(image.media_filename).name: image for image in images}
+    ordered: list[Image] = []
+    used: set[str] = set()
+    for src in (*lead_srcs, *body_srcs):
+        name = Path(src).name
+        image = by_name.get(name)
+        if image is not None and name not in used:
+            ordered.append(image)
+            used.add(name)
+    ordered.extend(
+        image for image in images if Path(image.media_filename).name not in used
+    )
+    return ordered
 
 
 def _read_created_date(src: Path) -> str:
@@ -141,26 +212,26 @@ def _read_created_date(src: Path) -> str:
         return ""
 
 
-def _extract_author(soup: BeautifulSoup) -> tuple[str, str]:
-    """Return ``(author, note)`` from the ``data-custom-style="Autor"``
+def _extract_author(soup: BeautifulSoup) -> tuple[str, bool]:
+    """Return ``(author, needs_review)`` from the ``data-custom-style="Autor"``
     elements, removing them from *soup*.
 
     The last element in document order supplies the author; a leading
-    ``Autor:`` label is stripped. *note* flags a missing author (no element,
-    or empty after stripping) or multiple "Autor" lines (last used).
+    ``Autor:`` label is stripped. *needs_review* is True when the author is
+    missing (no element, or empty after stripping) or multiple "Autor"
+    lines exist (last used); both map to the single ``Autor`` note item.
     """
-    missing = "Author missing: no Autor line in document"
     elements = soup.find_all(None, attrs={"data-custom-style": _AUTOR_STYLE})
     if not elements:
-        return "", missing
+        return "", True
     author = _AUTOR_LABEL_RE.sub("", elements[-1].get_text()).strip()
     for element in elements:
         element.decompose()
     if not author:
-        return "", "Author missing: Autor line is empty"
+        return "", True
     if len(elements) > 1:
-        return author, "Multiple Autor lines in document; last one used"
-    return author, ""
+        return author, True
+    return author, False
 
 
 class DocxConverter(AbstractConverter):
@@ -169,6 +240,7 @@ class DocxConverter(AbstractConverter):
         media_dir = tempfile.mkdtemp(prefix="media-")
         try:
             fallback_title = src.stem
+            note_builder = NoteBuilder()
             html = pypandoc.convert_file(
                 str(src),
                 to="html-native_spans",
@@ -255,23 +327,24 @@ class DocxConverter(AbstractConverter):
 
             _flag_lead_images(images, lead_srcs)
             _apply_image_captions(images, captions)
+            body_srcs = [
+                str(img.get("src")) for img in soup.find_all("img") if img.get("src")
+            ]
+            images = _order_images(images, lead_srcs, body_srcs)
 
             # The "Autor" styled line carries the author: take the last
             # occurrence, strip an optional "Autor:" label, and remove the
             # line from the body (after lead processing, so an "Autor"-styled
             # lead-image paragraph is not mistaken for the byline).
-            author, author_note = _extract_author(soup)
+            author, author_needs_review = _extract_author(soup)
+            if author_needs_review:
+                note_builder.add(NoteItem.AUTHOR)
             created_date = _read_created_date(src)
-            date_note = "" if created_date else "Creation date missing"
-            note = "; ".join(
-                n
-                for n in (
-                    author_note,
-                    date_note,
-                    _guessed_caption_note(images, guessed_srcs),
-                )
-                if n
-            )
+            if not created_date:
+                note_builder.add(NoteItem.CREATED_DATE)
+            for item in _guessed_caption_items(images, guessed_srcs):
+                note_builder.add_image_ref(item)
+            note = note_builder.build()
 
             return Article(
                 source_file=src,
