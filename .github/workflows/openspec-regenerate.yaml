@@ -15,10 +15,10 @@ jobs:
       contents: write # push the fix to the PR branch
       actions: write # re-trigger the pipeline via `gh workflow run`
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.head_ref }} # the PR branch, not the merge ref
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: npm
