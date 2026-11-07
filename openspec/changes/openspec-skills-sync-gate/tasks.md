@@ -26,6 +26,12 @@
 - [x] 5.1 Run `make ci` and `openspec validate --all`, and verify both exit 0
 - [x] 5.2 Verify (no change needed) that the branch-protection required set `{lint-and-test, openspec, lint-pr-title}` is intact and is satisfied by the retriggered pipeline on the fixed head
 
+## 6. Fresh-environment gate fix (found on first live run)
+
+- [x] 6.1 Filter the gate (`ci.yaml`) and the staleness condition (`openspec-regenerate.yaml`) to in-repo paths — `jq '[.changes[] | select(.path | startswith("~") | not)] | length'` — because in a fresh CI environment the CLI's first run plans to create the machine-global `~/.config/openspec/config.json` (profile/delivery are machine-global; no project-level config exists for them), which the unfiltered count reported as a change on every run
+- [x] 6.2 Verify in fresh-environment simulations: in sync → 0 counted changes, stale → exactly the seven `.agents/skills/**` paths; a real `openspec update` in a fresh environment touches nothing (in sync) or only `.agents/skills/**` (stale) — no command files, no extra workflows
+- [x] 6.3 Record in design.md the filter decision (machine-global config, `~/**` paths excluded) and the core-scoping guarantee (scoped `git add .agents/skills` + `core` profile default)
+
 ## Workflow follow-up
 
 - Archive the change once the project's review requirements are satisfied (per repo rules, the archive is the owner's own commit).

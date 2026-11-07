@@ -28,8 +28,10 @@ Renovate's config automerges qualifying PRs on the platform (`platformAutomerge`
 
 ## Decisions
 
-- **Assert on the JSON output, not the exit code.** The gate is `test "$(openspec update --dry-run --json | jq '.changes | length')" -eq 0`. Alternative considered: plain `openspec update --dry-run` relying on the exit code — rejected because the exit code is 0 while stale (verified empirically); it would never fire.
+- **Assert on the JSON output, not the exit code.** The gate is `test "$(openspec update --dry-run --json | jq '[.changes[] | select(.path | startswith("~") | not)] | length')" -eq 0`. Alternative considered: plain `openspec update --dry-run` relying on the exit code — rejected because the exit code is 0 while stale (verified empirically); it would never fire.
 - **`jq` for the assertion.** Preinstalled on `ubuntu-latest`; more readable than a Node one-liner. If a future runner image dropped `jq`, the step fails loudly (`command not found`) rather than passing silently.
+- **Filter out non-repo paths (`~/**`).** Discovered on the first live run: in a fresh environment (every CI runner) the CLI's first run plans to create its machine-global `~/.config/openspec/config.json` (profile/delivery are machine-global by design — `openspec.dev/docs/profiles`; there is no project-level setting for them, `openspec/config.yaml` carries agent rules only) and reports that as a pending change. Unfiltered, the gate would fail on every run regardless of drift, and the regenerate job's `-gt 0` condition would send every in-sync PR into the fix branch, where `git commit` fails on an empty diff. The sync invariant is about the repo's generated files, so both the gate and the staleness condition count only changes whose path is not a `~`-prefixed global path. This also keeps the gate immune to future CLI changes in out-of-repo first-run behavior.
+- **Only core-config files can be regenerated.** The regenerate job's commit is scoped to `git add .agents/skills`, so the bot commit can only contain the generated skill files; and in a fresh environment the CLI defaults to the `core` profile (exactly the six installed workflows) with a first-run migration that infers `delivery: skills` from the present state. Verified empirically: a real `openspec update` in a fresh environment touches nothing (in sync) or exactly the seven `.agents/skills/**` files (stale) — no command files, no extra workflows.
 - **New step in the existing `openspec` job**, after `Validate OpenSpec artifacts`. Alternative: a separate job — rejected; it would duplicate checkout, Node setup, and `npm ci` for one extra CLI invocation.
 - **Gate on `changes` only.** Operational errors already fail the step via the CLI's non-zero exit; the assertion adds exactly the sync invariant and nothing else.
 - **The fix lives in its own workflow** (`.github/workflows/openspec-regenerate.yaml`). It needs a writable checkout of the PR head branch, its own `permissions:` block, and a PR-only trigger scope; keeping it out of `ci.yaml` keeps the pipeline file a pure gate. The single cross-file reference in the design is the retrigger line itself — a name reference of the same kind a `workflows: [ … ]` list would be, kept visible in the fix job rather than hidden in a trigger block.
@@ -63,7 +65,7 @@ the gate step in the `openspec` job:
 ```yaml
       - name: Check generated OpenSpec files are in sync
         run: |
-          test "$(./node_modules/.bin/openspec update --dry-run --json | jq '.changes | length')" -eq 0
+          test "$(./node_modules/.bin/openspec update --dry-run --json | jq '[.changes[] | select(.path | startswith("~") | not)] | length')" -eq 0
 ```
 
 and the moved title job (verbatim from `commitlint.yaml`, minus its event-name gate):
@@ -125,7 +127,7 @@ jobs:
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
-          if [ "$(./node_modules/.bin/openspec update --dry-run --json | jq '.changes | length')" -gt 0 ]; then
+          if [ "$(./node_modules/.bin/openspec update --dry-run --json | jq '[.changes[] | select(.path | startswith("~") | not)] | length')" -gt 0 ]; then
             ./node_modules/.bin/openspec update
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

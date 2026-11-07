@@ -46,7 +46,7 @@ jobs:
 
       - name: Check generated OpenSpec files are in sync
         run: |
-          test "$(./node_modules/.bin/openspec update --dry-run --json | jq '.changes | length')" -eq 0
+          test "$(./node_modules/.bin/openspec update --dry-run --json | jq '[.changes[] | select(.path | startswith("~") | not)] | length')" -eq 0
 
   lint-pr-title:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.pr_title != ''

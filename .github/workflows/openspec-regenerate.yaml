@@ -28,7 +28,7 @@ jobs:
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
-          if [ "$(./node_modules/.bin/openspec update --dry-run --json | jq '.changes | length')" -gt 0 ]; then
+          if [ "$(./node_modules/.bin/openspec update --dry-run --json | jq '[.changes[] | select(.path | startswith("~") | not)] | length')" -gt 0 ]; then
             ./node_modules/.bin/openspec update
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
