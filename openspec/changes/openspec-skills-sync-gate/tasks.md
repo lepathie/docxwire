@@ -36,6 +36,10 @@
 
 - [x] 7.1 Set `GH_TOKEN: ${{ github.token }}` on the retrigger step of `openspec-regenerate.yaml` — the first live run failed with `gh: … set the GH_TOKEN environment variable` because `gh` in an Actions run authenticates from `GH_TOKEN`, not the job's `GITHUB_TOKEN`; the token carries the `actions: write` scope from the job's `permissions:` block
 
+## 8. PR check attribution fix (found on first live PRs)
+
+- [x] 8.1 Add a `publish-pr-checks` job to `ci.yaml` that mirrors the three job conclusions (`lint-and-test`, `openspec`, `lint-pr-title`) as explicit check runs on the PR head — `POST /repos/{owner}/{repo}/check-runs` with `head_sha` = the dispatched head SHA and conclusions mapped from `needs['<job>'].result` — because per GitHub's docs, checks from a `workflow_dispatch` run are never attributed to a PR's required checks, while an explicit check-run POST on an open PR's head is
+
 ## Workflow follow-up
 
 - Archive the change once the project's review requirements are satisfied (per repo rules, the archive is the owner's own commit).

@@ -67,3 +67,39 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.inputs.pr_title }}
         run: echo "$PR_TITLE" | ./node_modules/.bin/commitlint
+
+  publish-pr-checks:
+    needs: [lint-and-test, openspec, lint-pr-title]
+    if: github.event_name == 'workflow_dispatch' && always()
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+    steps:
+      - name: Mirror job conclusions as check runs on the PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
+          LINT_AND_TEST: ${{ needs['lint-and-test'].result }}
+          OPENSPEC: ${{ needs.openspec.result }}
+          LINT_PR_TITLE: ${{ needs['lint-pr-title'].result }}
+        run: |
+          mirror() {
+            name="$1"
+            case "$2" in
+              success) conclusion="success" ;;
+              failure) conclusion="failure" ;;
+              cancelled) conclusion="cancelled" ;;
+              *) conclusion="skipped" ;;
+            esac
+            gh api -X POST "repos/$REPO/check-runs" \
+              -f "name=$name" \
+              -f "head_sha=$HEAD_SHA" \
+              -f "status=completed" \
+              -f "conclusion=$conclusion" \
+              -f "output[title]=$name" \
+              -f "output[summary]=Mirrored from the retriggered CI pipeline run"
+          }
+          mirror "lint-and-test" "$LINT_AND_TEST"
+          mirror "openspec" "$OPENSPEC"
+          mirror "lint-pr-title" "$LINT_PR_TITLE"
