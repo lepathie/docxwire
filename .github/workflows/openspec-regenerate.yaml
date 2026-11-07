@@ -40,4 +40,5 @@ jobs:
         env:
           BRANCH: ${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ github.token }}
         run: gh workflow run ci.yaml --ref "$BRANCH" -f "pr_title=$PR_TITLE"

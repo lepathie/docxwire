@@ -40,6 +40,7 @@ Renovate's config automerges qualifying PRs on the platform (`platformAutomerge`
 - **All three required checks in the single retriggered pipeline.** `lint-pr-title` moves from `commitlint.yaml` into `ci.yaml`, gated on `workflow_dispatch` with a non-empty `pr_title` input; the retrigger passes the PR title as a dispatch input. `commitlint.yaml` retains only its push-to-`main` `lint-commits` job, which remains the enforcement backstop (squash-merge commit message = PR title). Consequence: a PR title *edit* no longer triggers an immediate re-lint (the old `commitlint.yaml` ran on `edited`); the push-to-`main` backstop is unchanged. Alternative considered: dispatch `ci.yaml` **and** `commitlint.yaml` (which would keep the `edited` re-lint) — rejected: two cross-file references and two runs for what is one pipeline.
 - **The retrigger runs for every PR, not just stale ones.** The dispatch is a separate, unconditional final step of the regenerate job (after the conditional fix), passing the PR title. This is what gives normal PRs their pipeline runs — with a stale-only dispatch, an in-sync PR would get no CI at all.
 - **Re-trigger after (or instead of) pushing.** The final step is `gh workflow run ci.yaml --ref <head branch> -f pr_title=<PR title>` (`gh` is preinstalled on `ubuntu-latest`).
+- **`gh` gets an explicit `GH_TOKEN`.** On the first live run the retrigger failed with `gh: … set the GH_TOKEN environment variable` — in an Actions run `gh` authenticates from `GH_TOKEN`, and the job's `GITHUB_TOKEN` was not picked up, so `gh` had no token. The step therefore sets `GH_TOKEN: ${{ github.token }}` explicitly (the canonical pattern). That token carries the `actions: write` scope from the job's `permissions:` block, which `gh workflow run` requires to dispatch the pipeline.
 - **Check out `github.head_ref`** in the fix job — the PR branch, not the merge ref — so the commit lands on the branch the PR is tracking.
 - **Skip fork PRs and the bot's own pushes** (`if: … head.repo.fork == false && github.actor != 'github-actions[bot]'`): fork PRs run with a read-only token and cannot be pushed to — Mend-hosted Renovate is a GitHub App creating branches on the origin repo, so its PRs are not fork PRs and are covered; the actor filter stops the approval-pending `synchronize` runs that every fix push creates (see Risks).
 - **Plain `git` + `gh` commands, not a third-party auto-commit action** — no new supply-chain dependency, consistent with the existing plain-`run` workflow style.
@@ -139,6 +140,7 @@ jobs:
         env:
           BRANCH: ${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ github.token }}
         run: gh workflow run ci.yaml --ref "$BRANCH" -f "pr_title=$PR_TITLE"
 ```
 

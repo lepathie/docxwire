@@ -32,6 +32,10 @@
 - [x] 6.2 Verify in fresh-environment simulations: in sync → 0 counted changes, stale → exactly the seven `.agents/skills/**` paths; a real `openspec update` in a fresh environment touches nothing (in sync) or only `.agents/skills/**` (stale) — no command files, no extra workflows
 - [x] 6.3 Record in design.md the filter decision (machine-global config, `~/**` paths excluded) and the core-scoping guarantee (scoped `git add .agents/skills` + `core` profile default)
 
+## 7. Retrigger auth fix (found on first live PR)
+
+- [x] 7.1 Set `GH_TOKEN: ${{ github.token }}` on the retrigger step of `openspec-regenerate.yaml` — the first live run failed with `gh: … set the GH_TOKEN environment variable` because `gh` in an Actions run authenticates from `GH_TOKEN`, not the job's `GITHUB_TOKEN`; the token carries the `actions: write` scope from the job's `permissions:` block
+
 ## Workflow follow-up
 
 - Archive the change once the project's review requirements are satisfied (per repo rules, the archive is the owner's own commit).
