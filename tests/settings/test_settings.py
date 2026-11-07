@@ -128,6 +128,46 @@ def test_load_settings_with_non_string_base_url_raises(tmp_path: Path) -> None:
         load_settings(tmp_path / "settings.toml")
 
 
+def test_load_settings_with_basic_auth_loaded_verbatim(tmp_path: Path) -> None:
+    (tmp_path / "settings.toml").write_text(
+        "[joomla]\n"
+        'base_url = "https://example.org"\n'
+        'base_path = "/p"\n'
+        'token = "t"\n'
+        'basic_auth = "b64_encoded"\n',
+        encoding="utf-8",
+    )
+
+    settings = load_settings(tmp_path / "settings.toml")
+
+    assert settings.joomla.basic_auth == "b64_encoded"
+
+
+def test_load_settings_without_basic_auth_is_unset(tmp_path: Path) -> None:
+    (tmp_path / "settings.toml").write_text(
+        '[joomla]\nbase_url = "https://example.org"\nbase_path = "/p"\ntoken = "t"\n',
+        encoding="utf-8",
+    )
+
+    settings = load_settings(tmp_path / "settings.toml")
+
+    assert settings.joomla.basic_auth is None
+
+
+def test_load_settings_with_non_string_basic_auth_raises(tmp_path: Path) -> None:
+    (tmp_path / "settings.toml").write_text(
+        "[joomla]\n"
+        'base_url = "https://example.org"\n'
+        'base_path = "/p"\n'
+        'token = "t"\n'
+        "basic_auth = 123\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="basic_auth"):
+        load_settings(tmp_path / "settings.toml")
+
+
 def test_convert_without_settings_file_succeeds(
     ruderkurs_doc: Path, tmp_path: Path, monkeypatch
 ) -> None:

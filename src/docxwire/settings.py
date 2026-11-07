@@ -31,6 +31,7 @@ class JoomlaSettings:
     base_path: str
     token: str
     default_catid: int = 0
+    basic_auth: str | None = None
 
 
 @dataclass(frozen=True)
@@ -78,11 +79,16 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_FILE) -> Settings:
     if isinstance(default_catid, bool) or not isinstance(default_catid, int):
         raise SettingsError(f"{file_path}: [joomla].default_catid must be an integer")
 
+    basic_auth = joomla_data.get("basic_auth")
+    if basic_auth is not None and not isinstance(basic_auth, str):
+        raise SettingsError(f"{file_path}: [joomla].basic_auth must be a string")
+
     return Settings(
         joomla=JoomlaSettings(
             base_url=joomla_data["base_url"],
             base_path=joomla_data["base_path"],
             token=joomla_data["token"],
             default_catid=default_catid,
+            basic_auth=basic_auth,
         )
     )

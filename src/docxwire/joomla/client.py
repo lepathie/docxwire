@@ -49,6 +49,8 @@ class JoomlaClient:
         self._settings = settings
         self._session = session if session is not None else requests.Session()
         self._session.headers["X-Joomla-Token"] = settings.token
+        if settings.basic_auth is not None:
+            self._session.headers["Authorization"] = f"Basic {settings.basic_auth}"
         self._session.headers["Accept"] = ACCEPT
         self._endpoint = settings.base_url + settings.base_path + ARTICLES_PATH
 

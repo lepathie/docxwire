@@ -10,12 +10,13 @@ from docxwire.joomla.client import JoomlaApiError, JoomlaClient
 from docxwire.settings import JoomlaSettings
 
 
-def make_settings() -> JoomlaSettings:
+def make_settings(basic_auth: str | None = None) -> JoomlaSettings:
     return JoomlaSettings(
         base_url="https://example.org",
         base_path="/api/index.php/v1",
         token="test-token",
         default_catid=7,
+        basic_auth=basic_auth,
     )
 
 
@@ -40,8 +41,8 @@ def session_factory() -> Any:
     return make_session
 
 
-def make_client(session: Any) -> JoomlaClient:
-    return JoomlaClient(make_settings(), session=session)
+def make_client(session: Any, basic_auth: str | None = None) -> JoomlaClient:
+    return JoomlaClient(make_settings(basic_auth), session=session)
 
 
 class TestClientConfiguration:
@@ -61,6 +62,28 @@ class TestClientConfiguration:
         session = session_factory()
         make_client(session)
         assert session.headers["Accept"] == "application/vnd.api+json"
+
+
+class TestBasicAuth:
+    def test_authorization_header_set_when_configured(
+        self, session_factory: Any
+    ) -> None:
+        session = session_factory()
+        make_client(session, basic_auth="dXNlcjpwYXNzd29yZA==")
+        assert session.headers["Authorization"] == "Basic dXNlcjpwYXNzd29yZA=="
+
+    def test_no_authorization_header_when_not_configured(
+        self, session_factory: Any
+    ) -> None:
+        session = session_factory()
+        make_client(session)
+        assert "Authorization" not in session.headers
+
+    def test_composes_with_joomla_token(self, session_factory: Any) -> None:
+        session = session_factory()
+        make_client(session, basic_auth="dXNlcjpwYXNzd29yZA==")
+        assert session.headers["Authorization"] == "Basic dXNlcjpwYXNzd29yZA=="
+        assert session.headers["X-Joomla-Token"] == "test-token"
 
 
 class TestArticleCrud:
