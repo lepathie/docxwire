@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any
 from unittest.mock import MagicMock
@@ -151,6 +152,46 @@ class TestFilterPassThrough:
             "list[ordering]": "title",
             "list[direction]": "desc",
         }
+
+
+class TestImageUpload:
+    def test_upload_posts_json_to_media_endpoint(self, session_factory: Any) -> None:
+        data = b"\x89PNG\r\n\x1a\n"
+        created = {"id": "local-images:/articles/2026/11/slug/img.png"}
+        session = session_factory(200, {"data": created})
+        result = make_client(session).upload_image(
+            data, "articles/2026/11/slug/img.png"
+        )
+        args, kwargs = session.request.call_args
+        method, url = args
+        assert method == "POST"
+        assert url == "https://example.org/api/index.php/v1/media/files"
+        assert kwargs["json"] == {
+            "path": "local-images:/articles/2026/11/slug/img.png",
+            "content": base64.b64encode(data).decode("ascii"),
+            "override": True,
+        }
+        assert result == created
+
+    def test_upload_reuses_existing_headers(self, session_factory: Any) -> None:
+        session = session_factory(200, {"data": {"id": "local-images:/articles/x.png"}})
+        make_client(session, basic_auth="dXNlcjpwYXNzd29yZA==").upload_image(
+            b"x", "articles/2026/11/slug/img.png"
+        )
+        assert session.headers["X-Joomla-Token"] == "test-token"
+        assert session.headers["Accept"] == "application/vnd.api+json"
+        assert session.headers["Authorization"] == "Basic dXNlcjpwYXNzd29yZA=="
+
+    def test_failed_upload_raises_typed_error_without_retry(
+        self, session_factory: Any
+    ) -> None:
+        errors = [{"title": "Upload failed"}]
+        session = session_factory(400, {"errors": errors})
+        with pytest.raises(JoomlaApiError) as excinfo:
+            make_client(session).upload_image(b"x", "articles/2026/11/slug/img.png")
+        assert excinfo.value.status == 400
+        assert excinfo.value.errors == errors
+        assert session.request.call_count == 1
 
 
 class TestErrorSurfacing:

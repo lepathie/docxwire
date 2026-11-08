@@ -1,4 +1,4 @@
-"""Transport and article CRUD for the Joomla 5 content API.
+"""Transport for the Joomla 5 content and Media APIs.
 
 Thin, synchronous client over ``requests``. This module owns the
 transport contract only: endpoint composition from the Joomla
@@ -9,6 +9,8 @@ settings, the ``X-Joomla-Token`` / ``Accept`` headers, and the
 
 from __future__ import annotations
 
+import base64
+
 import requests
 
 from docxwire.settings import JoomlaSettings
@@ -16,6 +18,8 @@ from docxwire.settings import JoomlaSettings
 __all__ = ["JoomlaApiError", "JoomlaClient"]
 
 ARTICLES_PATH = "/content/articles"
+MEDIA_FILES_PATH = "/media/files"
+IMAGES_ADAPTER = "local-images"
 ACCEPT = "application/vnd.api+json"
 
 
@@ -41,7 +45,8 @@ class JoomlaApiError(Exception):
 
 
 class JoomlaClient:
-    """Thin client for the Joomla 5 content API article endpoints."""
+    """Thin client for the Joomla 5 content API article endpoints and the
+    Media API image upload."""
 
     def __init__(
         self, settings: JoomlaSettings, session: requests.Session | None = None
@@ -53,6 +58,7 @@ class JoomlaClient:
             self._session.headers["Authorization"] = f"Basic {settings.basic_auth}"
         self._session.headers["Accept"] = ACCEPT
         self._endpoint = settings.base_url + settings.base_path + ARTICLES_PATH
+        self._media_endpoint = settings.base_url + settings.base_path + MEDIA_FILES_PATH
 
     def list_articles(self, **params: str | int) -> list[dict]:
         """List articles, forwarding *params* as query parameters unchanged."""
@@ -83,6 +89,22 @@ class JoomlaClient:
         {"state": -2})``), then call this.
         """
         self._request("DELETE", f"{self._endpoint}/{article_id}")
+
+    def upload_image(self, data: bytes, rel_path: str) -> dict:
+        """Upload an image to *rel_path* under the site's ``images/`` tree.
+
+        POSTs the base64-encoded content to the Media API's
+        ``/media/files`` endpoint with the images-adapter-prefixed path
+        and ``override: true`` (an idempotent re-publish); the API creates
+        the full parent directory chain in the single call. Returns the
+        created item's data.
+        """
+        body = {
+            "path": f"{IMAGES_ADAPTER}:/{rel_path}",
+            "content": base64.b64encode(data).decode("ascii"),
+            "override": True,
+        }
+        return self._request("POST", self._media_endpoint, json=body)["data"]
 
     def _request(self, method: str, url: str, **kwargs) -> dict:
         response = self._session.request(method, url, **kwargs)
