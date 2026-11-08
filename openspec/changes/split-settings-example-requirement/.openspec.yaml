@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-11-08
+goal: Split the settings spec's overlong "An example settings file is committed"
+  requirement (558 chars) into one-behavior requirements, per the canonical OpenSpec split
+affected_areas:
+  - specs
