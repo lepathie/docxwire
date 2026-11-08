@@ -2,8 +2,8 @@
 
 ## 1. Validation
 
-- [ ] 1.1 Verify the split delta validates strict — `openspec validate split-settings-example-requirement --strict` exits 0 with no length warnings
-- [ ] 1.2 Verify `make ci` stays green (spec-only change, no code) — lint, type check, tests at 100% coverage
+- [x] 1.1 Verify the split delta validates strict — `openspec validate split-settings-example-requirement --strict` exits 0 with no length warnings
+- [x] 1.2 Verify `make ci` stays green (spec-only change, no code) — lint, type check, tests at 100% coverage
 
 ## Workflow follow-up
 
