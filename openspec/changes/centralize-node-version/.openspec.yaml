@@ -1,0 +1,7 @@
+schema: spec-driven
+created: 2026-11-08
+goal: Make the Node.js version a single source of truth (.nvmrc), point CI at it,
+  bump to 26, and correct the engines.node floor to the dependency tree's real minimum
+affected_areas:
+  - ci
+skip_specs: true
