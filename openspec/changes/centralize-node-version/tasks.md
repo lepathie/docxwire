@@ -30,12 +30,12 @@
 ## 6. Integration
 
 - [x] 6.1 Run `make ci` and verify it exits 0 (the local aggregate of all the CI checks: `lint`, `check-specs`, `check-deps`, `test`)
-- [ ] 6.2 Verify the Node jobs resolve Node 26 from `.nvmrc`: the push-to-`main` `ci.yaml` run (or a manual `workflow_dispatch`) is green with the `check-specs` / `check-deps` / `lint-pr-title` jobs executing `make check-specs` / `make check-deps` / commitlint on Node 26
+- [x] 6.2 Verify the Node jobs resolve Node 26 from `.nvmrc`: the push-to-`main` `ci.yaml` run (or a manual `workflow_dispatch`) is green with the `check-specs` / `check-deps` / `lint-pr-title` jobs executing `make check-specs` / `make check-deps` / commitlint on Node 26
 
 ## 7. Superseded PRs
 
-- [ ] 7.1 Close Renovate PRs #5 (→24) and #6 (→26) as obsolete; verify both report closed
-- [ ] 7.2 In sync with the merge, update the branch-protection required checks: `lint-and-test` → `lint` + `test`, `openspec-validate` → `check-specs` (`check-deps` optional); verify the setting
+- [x] 7.1 Close Renovate PRs #5 (→24) and #6 (→26) as obsolete; verify both report closed
+- [x] 7.2 In sync with the merge, update the branch-protection required checks: `lint-and-test` → `lint` + `test`, `openspec-validate` → `check-specs` (`check-deps` optional); verify the setting
 
 ## Workflow follow-up
 
