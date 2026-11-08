@@ -3,12 +3,13 @@ from __future__ import annotations
 import subprocess
 import sys
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from docxwire.converter import DocxConverter
-from docxwire.settings import Settings, SettingsError, load_settings
+from docxwire.settings import SettingsError, load_settings
 
 VALID_SETTINGS = """\
 [joomla]
@@ -19,11 +20,23 @@ default_catid = 7
 """
 
 
+@pytest.fixture
+def write_settings(tmp_path: Path) -> Callable[[str], Path]:
+    """Write *content* to a scratch ``settings.toml`` and return its path."""
+
+    def _write(content: str) -> Path:
+        path = tmp_path / "settings.toml"
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    return _write
+
+
 def test_load_settings_from_default_path_preserves_values(
-    tmp_path: Path, monkeypatch
+    write_settings: Callable[[str], Path],
+    monkeypatch,
 ) -> None:
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "settings.toml").write_text(VALID_SETTINGS, encoding="utf-8")
+    monkeypatch.chdir(write_settings(VALID_SETTINGS).parent)
 
     settings = load_settings()
 
@@ -33,9 +46,11 @@ def test_load_settings_from_default_path_preserves_values(
     assert settings.joomla.default_catid == 7
 
 
-def test_load_settings_from_explicit_path_reads_given_file(tmp_path: Path) -> None:
-    (tmp_path / "settings.toml").write_text(VALID_SETTINGS, encoding="utf-8")
-    other = tmp_path / "other.toml"
+def test_load_settings_from_explicit_path_reads_given_file(
+    write_settings: Callable[[str], Path],
+) -> None:
+    main = write_settings(VALID_SETTINGS)
+    other = main.parent / "other.toml"
     other.write_text(
         "[joomla]\n"
         'base_url = "https://other.example"\n'
@@ -51,13 +66,14 @@ def test_load_settings_from_explicit_path_reads_given_file(tmp_path: Path) -> No
     assert settings.joomla.token == "t2"
 
 
-def test_load_settings_without_default_catid_is_zero(tmp_path: Path) -> None:
-    (tmp_path / "settings.toml").write_text(
-        '[joomla]\nbase_url = "https://example.org"\nbase_path = "/p"\ntoken = "t"\n',
-        encoding="utf-8",
+def test_load_settings_without_default_catid_is_zero(
+    write_settings: Callable[[str], Path],
+) -> None:
+    path = write_settings(
+        '[joomla]\nbase_url = "https://example.org"\nbase_path = "/p"\ntoken = "t"\n'
     )
 
-    settings = load_settings(tmp_path / "settings.toml")
+    settings = load_settings(path)
 
     assert settings.joomla.default_catid == 0
 
@@ -72,104 +88,105 @@ def test_load_settings_without_file_points_at_example(
 
 
 def test_load_settings_with_malformed_toml_raises_settings_error(
-    tmp_path: Path,
+    write_settings: Callable[[str], Path],
 ) -> None:
-    (tmp_path / "settings.toml").write_text("[joomla\nbase_url = ", encoding="utf-8")
+    path = write_settings("[joomla\nbase_url = ")
 
     with pytest.raises(SettingsError) as excinfo:
-        load_settings(tmp_path / "settings.toml")
+        load_settings(path)
 
     assert not isinstance(excinfo.value, tomllib.TOMLDecodeError)
 
 
-def test_load_settings_without_joomla_section_names_section(tmp_path: Path) -> None:
-    (tmp_path / "settings.toml").write_text(
-        '[other]\nkey = "value"\n', encoding="utf-8"
-    )
+def test_load_settings_without_joomla_section_names_section(
+    write_settings: Callable[[str], Path],
+) -> None:
+    path = write_settings('[other]\nkey = "value"\n')
 
     with pytest.raises(SettingsError, match="joomla"):
-        load_settings(tmp_path / "settings.toml")
+        load_settings(path)
 
 
-def test_load_settings_without_token_names_key(tmp_path: Path) -> None:
-    (tmp_path / "settings.toml").write_text(
-        '[joomla]\nbase_url = "https://example.org"\nbase_path = "/p"\n',
-        encoding="utf-8",
+def test_load_settings_without_token_names_key(
+    write_settings: Callable[[str], Path],
+) -> None:
+    path = write_settings(
+        '[joomla]\nbase_url = "https://example.org"\nbase_path = "/p"\n'
     )
 
     with pytest.raises(SettingsError, match="token"):
-        load_settings(tmp_path / "settings.toml")
+        load_settings(path)
 
 
 @pytest.mark.parametrize("value", ['"abc"', "true"])
 def test_load_settings_with_non_integer_default_catid_raises(
-    tmp_path: Path, value: str
+    write_settings: Callable[[str], Path],
+    value: str,
 ) -> None:
-    (tmp_path / "settings.toml").write_text(
+    path = write_settings(
         "[joomla]\n"
         'base_url = "https://example.org"\n'
         'base_path = "/p"\n'
         'token = "t"\n'
-        f"default_catid = {value}\n",
-        encoding="utf-8",
+        f"default_catid = {value}\n"
     )
 
     with pytest.raises(SettingsError, match="default_catid"):
-        load_settings(tmp_path / "settings.toml")
+        load_settings(path)
 
 
-def test_load_settings_with_non_string_base_url_raises(tmp_path: Path) -> None:
-    (tmp_path / "settings.toml").write_text(
-        '[joomla]\nbase_url = 123\nbase_path = "/p"\ntoken = "t"\n',
-        encoding="utf-8",
-    )
+@pytest.mark.parametrize("field", ["base_url", "base_path", "basic_auth", "token"])
+def test_load_settings_with_non_string_fields_raises(
+    write_settings: Callable[[str], Path],
+    field: str,
+) -> None:
+    values = {
+        "base_url": '"https://example.org"',
+        "base_path": '"/p"',
+        "basic_auth": '"b64_encoded"',
+        "token": '"t"',
+    }
+    values[field] = "123"
+    toml = "[joomla]\n" + "".join(f"{key} = {value}\n" for key, value in values.items())
 
-    with pytest.raises(SettingsError, match="base_url"):
-        load_settings(tmp_path / "settings.toml")
+    path = write_settings(toml)
+
+    with pytest.raises(SettingsError, match=field):
+        load_settings(path)
 
 
-def test_load_settings_with_basic_auth_loaded_verbatim(tmp_path: Path) -> None:
-    (tmp_path / "settings.toml").write_text(
+def test_load_settings_with_basic_auth_loaded_verbatim(
+    write_settings: Callable[[str], Path],
+) -> None:
+    path = write_settings(
         "[joomla]\n"
         'base_url = "https://example.org"\n'
         'base_path = "/p"\n'
+        'basic_auth = "b64_encoded"\n'
         'token = "t"\n'
-        'basic_auth = "b64_encoded"\n',
-        encoding="utf-8",
     )
 
-    settings = load_settings(tmp_path / "settings.toml")
+    settings = load_settings(path)
 
     assert settings.joomla.basic_auth == "b64_encoded"
 
 
-def test_load_settings_without_basic_auth_is_unset(tmp_path: Path) -> None:
-    (tmp_path / "settings.toml").write_text(
-        '[joomla]\nbase_url = "https://example.org"\nbase_path = "/p"\ntoken = "t"\n',
-        encoding="utf-8",
+def test_load_settings_without_basic_auth_is_unset(
+    write_settings: Callable[[str], Path],
+) -> None:
+    path = write_settings(
+        '[joomla]\nbase_url = "https://example.org"\nbase_path = "/p"\ntoken = "t"\n'
     )
 
-    settings = load_settings(tmp_path / "settings.toml")
+    settings = load_settings(path)
 
     assert settings.joomla.basic_auth is None
 
 
-def test_load_settings_with_non_string_basic_auth_raises(tmp_path: Path) -> None:
-    (tmp_path / "settings.toml").write_text(
-        "[joomla]\n"
-        'base_url = "https://example.org"\n'
-        'base_path = "/p"\n'
-        'token = "t"\n'
-        "basic_auth = 123\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(SettingsError, match="basic_auth"):
-        load_settings(tmp_path / "settings.toml")
-
-
 def test_convert_without_settings_file_succeeds(
-    ruderkurs_doc: Path, tmp_path: Path, monkeypatch
+    ruderkurs_doc: Path,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
 
@@ -197,24 +214,35 @@ def test_converter_import_does_not_load_settings() -> None:
     assert result.returncode == 0, result.stderr
 
 
-@pytest.fixture(scope="session")
-def example_settings() -> Settings:
-    """The committed settings.toml.example, loaded through the real loader."""
-    example = Path(__file__).resolve().parents[2] / "settings.toml.example"
-    return load_settings(example)
+@pytest.fixture
+def joomla_settings() -> dict:
+    """Load the [joomla] section from settings.toml.example."""
+    example_path = Path(__file__).resolve().parents[2] / "settings.toml.example"
+    return tomllib.loads(example_path.read_text(encoding="utf-8"))["joomla"]
 
 
-def test_example_file_documents_all_joomla_keys(
-    example_settings: Settings,
-) -> None:
-    joomla = example_settings.joomla
+def test_joomla_keys_are_complete(joomla_settings: dict) -> None:
+    expected_keys = {
+        "base_url",
+        "base_path",
+        "basic_auth",
+        "token",
+        "default_catid",
+    }
+    assert set(joomla_settings) == expected_keys
 
-    assert joomla.base_url
-    assert joomla.base_path
-    assert joomla.token
-    assert joomla.basic_auth
-    assert joomla.default_catid == 0
+
+@pytest.mark.parametrize("key", ["base_url", "base_path", "basic_auth", "token"])
+def test_joomla_placeholder_strings_are_valid(joomla_settings: dict, key: str) -> None:
+    value = joomla_settings[key]
+    assert isinstance(value, str), f"Expected '{key}' to be a string"
+    assert value, f"Expected '{key}' to carry a non-empty placeholder"
 
 
-def test_example_file_pins_joomla5_base_path(example_settings: Settings) -> None:
-    assert example_settings.joomla.base_path == "/api/index.php/v1"
+def test_joomla_sentinels_and_defaults(joomla_settings: dict) -> None:
+    # The Joomla 5 API path shape
+    assert joomla_settings["base_path"] == "/api/index.php/v1"
+
+    # 0 is the "no category set" sentinel (must be an integer)
+    assert joomla_settings["default_catid"] == 0
+    assert isinstance(joomla_settings["default_catid"], int)
