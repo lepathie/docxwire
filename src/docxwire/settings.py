@@ -23,15 +23,15 @@ class SettingsError(Exception):
     """The settings file is missing, malformed, or fails validation."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class JoomlaSettings:
     """Connection settings for the Joomla publishing target."""
 
     base_url: str
     base_path: str
+    basic_auth: str | None = None
     token: str
     default_catid: int = 0
-    basic_auth: str | None = None
 
 
 @dataclass(frozen=True)
@@ -87,8 +87,8 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_FILE) -> Settings:
         joomla=JoomlaSettings(
             base_url=joomla_data["base_url"],
             base_path=joomla_data["base_path"],
+            basic_auth=basic_auth,
             token=joomla_data["token"],
             default_catid=default_catid,
-            basic_auth=basic_auth,
         )
     )

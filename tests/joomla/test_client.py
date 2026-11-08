@@ -15,9 +15,9 @@ def make_settings(basic_auth: str | None = None) -> JoomlaSettings:
     return JoomlaSettings(
         base_url="https://example.org",
         base_path="/api/index.php/v1",
+        basic_auth=basic_auth,
         token="test-token",
         default_catid=7,
-        basic_auth=basic_auth,
     )
 
 
