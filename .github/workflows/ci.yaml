@@ -10,8 +10,10 @@ on:
         required: false
         type: string
 
+# One job per make target, all running in parallel — `make ci` is the
+# local aggregate of exactly these targets (plus `test`).
 jobs:
-  lint-and-test:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,10 +26,26 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Lint and test
-        run: make ci
+      - name: Lint
+        run: make lint
 
-  openspec-validate:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Test
+        run: make test
+
+  check-specs:
     runs-on: ubuntu-latest
 
     steps:
@@ -35,18 +53,31 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate OpenSpec artifacts
-        run: ./node_modules/.bin/openspec validate --all
+      - name: Check specs
+        run: make check-specs
 
-      - name: Check generated OpenSpec files are in sync
-        run: |
-          test "$(./node_modules/.bin/openspec update --dry-run --json | jq '[.changes[] | select(.path | startswith("~") | not)] | length')" -eq 0
+  check-deps:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check deps
+        run: make check-deps
 
   lint-pr-title:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.pr_title != ''
@@ -57,7 +88,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -69,7 +100,7 @@ jobs:
         run: echo "$PR_TITLE" | ./node_modules/.bin/commitlint
 
   publish-pr-checks:
-    needs: [lint-and-test, openspec-validate, lint-pr-title]
+    needs: [lint, test, check-specs, check-deps, lint-pr-title]
     if: github.event_name == 'workflow_dispatch' && always()
     runs-on: ubuntu-latest
     permissions:
@@ -80,8 +111,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.sha }}
-          LINT_AND_TEST: ${{ needs['lint-and-test'].result }}
-          OPENSPEC_VALIDATE: ${{ needs['openspec-validate'].result }}
+          LINT: ${{ needs['lint'].result }}
+          TEST: ${{ needs['test'].result }}
+          CHECK_SPECS: ${{ needs['check-specs'].result }}
+          CHECK_DEPS: ${{ needs['check-deps'].result }}
           LINT_PR_TITLE: ${{ needs['lint-pr-title'].result }}
         run: |
           mirror() {
@@ -100,6 +133,8 @@ jobs:
               -f "output[title]=$name" \
               -f "output[summary]=Mirrored from the retriggered CI pipeline run"
           }
-          mirror "lint-and-test" "$LINT_AND_TEST"
-          mirror "openspec-validate" "$OPENSPEC_VALIDATE"
+          mirror "lint" "$LINT"
+          mirror "test" "$TEST"
+          mirror "check-specs" "$CHECK_SPECS"
+          mirror "check-deps" "$CHECK_DEPS"
           mirror "lint-pr-title" "$LINT_PR_TITLE"
