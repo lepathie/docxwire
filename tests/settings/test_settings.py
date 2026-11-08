@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from docxwire.converter import DocxConverter
-from docxwire.settings import SettingsError, load_settings
+from docxwire.settings import Settings, SettingsError, load_settings
 
 VALID_SETTINGS = """\
 [joomla]
@@ -195,3 +195,26 @@ def test_converter_import_does_not_load_settings() -> None:
     )
 
     assert result.returncode == 0, result.stderr
+
+
+@pytest.fixture(scope="session")
+def example_settings() -> Settings:
+    """The committed settings.toml.example, loaded through the real loader."""
+    example = Path(__file__).resolve().parents[2] / "settings.toml.example"
+    return load_settings(example)
+
+
+def test_example_file_documents_all_joomla_keys(
+    example_settings: Settings,
+) -> None:
+    joomla = example_settings.joomla
+
+    assert joomla.base_url
+    assert joomla.base_path
+    assert joomla.token
+    assert joomla.basic_auth
+    assert joomla.default_catid == 0
+
+
+def test_example_file_pins_joomla5_base_path(example_settings: Settings) -> None:
+    assert example_settings.joomla.base_path == "/api/index.php/v1"

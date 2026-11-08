@@ -5,7 +5,7 @@
 
 [joomla]
 base_url = "https://your-site.example"
-base_path = "/index.php/api/index.php"
+base_path = "/api/index.php/v1"
 token = "replace-with-your-api-token"
 default_catid = 0
 # Optional. Sent verbatim as `Authorization: Basic <value>` on every
