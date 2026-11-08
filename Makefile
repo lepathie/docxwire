@@ -20,7 +20,7 @@ lint:
 # Validate OpenSpec artifacts and generated-file sync
 .PHONY: check-specs
 check-specs:
-	./node_modules/.bin/openspec validate --all
+	./node_modules/.bin/openspec validate --all --strict
 	test "$$(./node_modules/.bin/openspec update --dry-run --json | jq '[.changes[] | select(.path | startswith("~") | not)] | length')" -eq 0
 
 # Check the engines.node floor matches the dependency tree's minimum
