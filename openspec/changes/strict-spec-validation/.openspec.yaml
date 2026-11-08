@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-11-08
+goal: Enforce OpenSpec strict spec validation in the check-specs CI gate
+affected_areas:
+  - ci
+skip_specs: true
