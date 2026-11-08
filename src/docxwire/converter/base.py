@@ -59,6 +59,7 @@ class Article:
     note: str = ""
     created_by_alias: str = ""
     images: list[Image] = field(default_factory=list)
+    language: str = ""
 
 
 class NoteItem(StrEnum):

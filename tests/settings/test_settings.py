@@ -135,7 +135,9 @@ def test_load_settings_with_non_integer_default_catid_raises(
         load_settings(path)
 
 
-@pytest.mark.parametrize("field", ["base_url", "base_path", "basic_auth", "token"])
+@pytest.mark.parametrize(
+    "field", ["base_url", "base_path", "basic_auth", "token", "default_language"]
+)
 def test_load_settings_with_non_string_fields_raises(
     write_settings: Callable[[str], Path],
     field: str,
@@ -145,6 +147,7 @@ def test_load_settings_with_non_string_fields_raises(
         "base_path": '"/p"',
         "basic_auth": '"b64_encoded"',
         "token": '"t"',
+        "default_language": '"de-DE"',
     }
     values[field] = "123"
     toml = "[joomla]\n" + "".join(f"{key} = {value}\n" for key, value in values.items())
@@ -181,6 +184,34 @@ def test_load_settings_without_basic_auth_is_unset(
     settings = load_settings(path)
 
     assert settings.joomla.basic_auth is None
+
+
+def test_load_settings_without_default_language_defaults_to_all_languages(
+    write_settings: Callable[[str], Path],
+) -> None:
+    path = write_settings(
+        '[joomla]\nbase_url = "https://example.org"\nbase_path = "/p"\ntoken = "t"\n'
+    )
+
+    settings = load_settings(path)
+
+    assert settings.joomla.default_language == "*"
+
+
+def test_load_settings_with_default_language_loaded_verbatim(
+    write_settings: Callable[[str], Path],
+) -> None:
+    path = write_settings(
+        "[joomla]\n"
+        'base_url = "https://example.org"\n'
+        'base_path = "/p"\n'
+        'token = "t"\n'
+        'default_language = "de-DE"\n'
+    )
+
+    settings = load_settings(path)
+
+    assert settings.joomla.default_language == "de-DE"
 
 
 def test_convert_without_settings_file_succeeds(
@@ -228,11 +259,14 @@ def test_joomla_keys_are_complete(joomla_settings: dict) -> None:
         "basic_auth",
         "token",
         "default_catid",
+        "default_language",
     }
     assert set(joomla_settings) == expected_keys
 
 
-@pytest.mark.parametrize("key", ["base_url", "base_path", "basic_auth", "token"])
+@pytest.mark.parametrize(
+    "key", ["base_url", "base_path", "basic_auth", "token", "default_language"]
+)
 def test_joomla_placeholder_strings_are_valid(joomla_settings: dict, key: str) -> None:
     value = joomla_settings[key]
     assert isinstance(value, str), f"Expected '{key}' to be a string"
@@ -246,3 +280,6 @@ def test_joomla_sentinels_and_defaults(joomla_settings: dict) -> None:
     # 0 is the "no category set" sentinel (must be an integer)
     assert joomla_settings["default_catid"] == 0
     assert isinstance(joomla_settings["default_catid"], int)
+
+    # `*` is Joomla's all-languages sentinel
+    assert joomla_settings["default_language"] == "*"

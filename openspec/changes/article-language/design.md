@@ -25,12 +25,12 @@ The `joomla-client` change's Verified contract established that the club's Jooml
 
 ## Risks / Trade-offs
 
-- **Sequencing:** the `joomla-client` delta is a MODIFIED of the archived "Article metadata is carried into the payload" requirement (the resolution is folded into it, replacing the "how that value is resolved is a separate concern" deferral). The `settings` delta's example-file block is written as the union of the current requirement and the `settings-example-base-path` pin (five keys, `base_path` pinned, `language` placeholder) — a MODIFIED block replaces the requirement wholesale at archive time, so this change must land after `settings-example-base-path` or it would drop the pin.
+- **Sequencing:** the `joomla-client` delta is a MODIFIED of the archived "Article metadata is carried into the payload" requirement (the resolution is folded into it, replacing the "how that value is resolved is a separate concern" deferral). The `settings` delta's example-file block is written as the union of the current requirement and the `settings-example-base-path` pin (five keys, `base_path` pinned, `default_language` placeholder) — a MODIFIED block replaces the requirement wholesale at archive time, so this change must land after `settings-example-base-path` or it would drop the pin.
 - **`settings.toml.example` is a contract** → a test asserts the keys and placeholders, so the example cannot drift from the loader again.
 
 ## Migration Plan
 
-None breaking: an existing `settings.toml` without `language` loads with `*` exactly as before. The club's `settings.toml` (gitignored) gains `language = "de-DE"`.
+None breaking: an existing `settings.toml` without `default_language` loads with `*` exactly as before. The club's `settings.toml` (gitignored) gains `default_language = "de-DE"`.
 
 ## Open Questions
 

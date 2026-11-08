@@ -12,3 +12,6 @@ base_path = "/api/index.php/v1"
 basic_auth = "replace-with-basic-auth-value"
 token = "replace-with-your-api-token"
 default_catid = 0
+# Optional. Default language sent with each created article; `*` is
+# the all-languages sentinel (a per-article override wins over this).
+default_language = "*"

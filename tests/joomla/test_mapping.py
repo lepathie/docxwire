@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 
 from docxwire.converter.base import Article, Image
 from docxwire.joomla.mapping import build_article_payload
+from docxwire.settings import JoomlaSettings
 
 
 def make_article(**overrides: object) -> Article:
@@ -33,26 +34,38 @@ def make_image(**overrides: object) -> Image:
     return image
 
 
+def make_settings(
+    default_catid: int = 7, default_language: str = "*"
+) -> JoomlaSettings:
+    return JoomlaSettings(
+        base_url="https://example.org",
+        base_path="/api/index.php/v1",
+        token="test-token",
+        default_catid=default_catid,
+        default_language=default_language,
+    )
+
+
 class TestPayloadBasics:
     def test_title_alias_and_category_are_mapped(self) -> None:
-        payload = build_article_payload(make_article(catid=5), default_catid=7)
+        payload = build_article_payload(make_article(catid=5), make_settings())
         assert payload["title"] == "Test Title"
         assert payload["alias"] == "test-title"
         assert payload["catid"] == 5
 
     def test_unset_category_falls_back_to_default(self) -> None:
-        payload = build_article_payload(make_article(catid=0), default_catid=7)
+        payload = build_article_payload(make_article(catid=0), make_settings())
         assert payload["catid"] == 7
 
 
 class TestBodyField:
     def test_body_placed_in_single_body_field(self) -> None:
-        payload = build_article_payload(make_article(), default_catid=7)
+        payload = build_article_payload(make_article(), make_settings())
         assert payload["introtext"] == "<p>Body HTML</p>"
         assert payload["fulltext"] == ""
 
     def test_deprecated_field_not_used(self) -> None:
-        payload = build_article_payload(make_article(), default_catid=7)
+        payload = build_article_payload(make_article(), make_settings())
         assert "articletext" not in payload
 
 
@@ -67,16 +80,35 @@ class TestMetadataCarryOver:
         ],
     )
     def test_field_carried(self, payload_key: str, expected: object) -> None:
-        payload = build_article_payload(make_article(), default_catid=7)
+        payload = build_article_payload(make_article(), make_settings())
         assert payload[payload_key] == expected
 
     def test_creation_date_is_carried(self) -> None:
-        payload = build_article_payload(make_article(), default_catid=7)
+        payload = build_article_payload(make_article(), make_settings())
         assert payload["created"] == "2026-03-01 12:00:00"
 
     def test_created_omitted_when_no_date(self) -> None:
-        payload = build_article_payload(make_article(created_date=""), default_catid=7)
+        payload = build_article_payload(make_article(created_date=""), make_settings())
         assert "created" not in payload
+
+
+class TestLanguageResolution:
+    def test_article_language_wins_over_settings(self) -> None:
+        payload = build_article_payload(
+            make_article(language="de-DE"),
+            make_settings(default_language="en-GB"),
+        )
+        assert payload["language"] == "de-DE"
+
+    def test_settings_language_used_when_article_has_none(self) -> None:
+        payload = build_article_payload(
+            make_article(), make_settings(default_language="de-DE")
+        )
+        assert payload["language"] == "de-DE"
+
+    def test_sentinel_used_when_neither_is_set(self) -> None:
+        payload = build_article_payload(make_article(), make_settings())
+        assert payload["language"] == "*"
 
 
 class TestBodyImageRewrite:
@@ -87,7 +119,7 @@ class TestBodyImageRewrite:
                 make_image(upload_path="/images/articles/2026/03/test-title/image1.png")
             ],
         )
-        payload = build_article_payload(article, default_catid=7)
+        payload = build_article_payload(article, make_settings())
         soup = BeautifulSoup(payload["introtext"], "html.parser")
         img = soup.find("img")
         assert img is not None
@@ -99,7 +131,7 @@ class TestBodyImageRewrite:
             images=[make_image()],  # upload_path never populated
         )
         with pytest.raises(ValueError):
-            build_article_payload(article, default_catid=7)
+            build_article_payload(article, make_settings())
 
 
 class TestImagesObject:
@@ -113,7 +145,7 @@ class TestImagesObject:
                 )
             ]
         )
-        payload = build_article_payload(article, default_catid=7)
+        payload = build_article_payload(article, make_settings())
         assert payload["images"] == {
             "image_intro": "/images/articles/2026/03/test-title/image1.png",
             "image_intro_alt": "",
@@ -139,7 +171,7 @@ class TestImagesObject:
                 ),
             ]
         )
-        payload = build_article_payload(article, default_catid=7)
+        payload = build_article_payload(article, make_settings())
         assert (
             payload["images"]["image_intro"]
             == "/images/articles/2026/03/test-title/first.png"
@@ -159,7 +191,7 @@ class TestImagesObject:
                 make_image(upload_path="/images/articles/2026/03/test-title/image1.png")
             ]
         )
-        payload = build_article_payload(article, default_catid=7)
+        payload = build_article_payload(article, make_settings())
         assert "images" not in payload
 
 
@@ -179,7 +211,7 @@ class TestCombinedMapping:
                 ),
             ],
         )
-        payload = build_article_payload(article, default_catid=7)
+        payload = build_article_payload(article, make_settings())
         soup = BeautifulSoup(payload["introtext"], "html.parser")
         img = soup.find("img")
         assert img is not None

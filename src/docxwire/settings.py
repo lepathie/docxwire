@@ -32,6 +32,7 @@ class JoomlaSettings:
     basic_auth: str | None = None
     token: str
     default_catid: int = 0
+    default_language: str = "*"
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,10 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_FILE) -> Settings:
     if basic_auth is not None and not isinstance(basic_auth, str):
         raise SettingsError(f"{file_path}: [joomla].basic_auth must be a string")
 
+    default_language = joomla_data.get("default_language", "*")
+    if not isinstance(default_language, str):
+        raise SettingsError(f"{file_path}: [joomla].default_language must be a string")
+
     return Settings(
         joomla=JoomlaSettings(
             base_url=joomla_data["base_url"],
@@ -90,5 +95,6 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_FILE) -> Settings:
             basic_auth=basic_auth,
             token=joomla_data["token"],
             default_catid=default_catid,
+            default_language=default_language,
         )
     )

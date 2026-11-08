@@ -11,32 +11,36 @@ from __future__ import annotations
 from bs4 import BeautifulSoup
 
 from docxwire.converter.base import Article
+from docxwire.settings import JoomlaSettings
 
 __all__ = ["build_article_payload"]
 
 ALL_LANGUAGES = "*"
 
 
-def build_article_payload(article: Article, default_catid: int) -> dict:
+def build_article_payload(article: Article, settings: JoomlaSettings) -> dict:
     """Map *article* to a flat create payload for the content API.
 
     The whole body goes into ``introtext`` with an empty ``fulltext``
     (no read-more split; ``articletext`` is never emitted), an unset
-    article category (sentinel ``0``) falls back to *default_catid*,
-    body ``<img>`` references are rewritten to the images' uploaded
-    paths (raising when one is missing), and the first lead image is
-    carried in the ``images`` object.
+    article category (sentinel ``0``) falls back to the settings'
+    ``default_catid``, body ``<img>`` references are rewritten to the
+    images' uploaded paths (raising when one is missing), and the first
+    lead image is carried in the ``images`` object. The payload's
+    ``language`` is the article's language when the article carries one,
+    else the settings' ``default_language``, else the all-languages
+    sentinel ``*``.
     """
     payload: dict[str, object] = {
         "title": article.title,
         "alias": article.slug,
-        "catid": article.catid or default_catid,
+        "catid": article.catid or settings.default_catid,
         "introtext": _rewrite_body_images(article),
         "fulltext": "",
         "created_by_alias": article.created_by_alias,
         "metadesc": article.metadesc,
         "metakey": article.metakey,
-        "language": ALL_LANGUAGES,
+        "language": article.language or settings.default_language or ALL_LANGUAGES,
     }
     if article.created_date:
         payload["created"] = article.created_date
