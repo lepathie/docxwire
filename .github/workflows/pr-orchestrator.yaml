@@ -1,4 +1,12 @@
-name: OpenSpec Skills Auto-Regenerate
+name: PR Orchestrator
+
+# Orchestrates pull requests to main:
+# - openspec-skills-sync: if the PR leaves the generated OpenSpec skill files
+#   (`.agents/skills/**`) stale — e.g. a Renovate bump of
+#   `@fission-ai/openspec` — regenerate them and push the fix to the PR branch.
+# - Every (non-fork, non-bot) PR run re-triggers the CI pipeline on the
+#   (possibly fixed) head via `gh workflow run` — the only way PRs get their
+#   checks, since ci.yaml runs on explicit dispatch only.
 
 on:
   pull_request:
@@ -6,7 +14,10 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  regenerate:
+  # Skips fork PRs (read-only token) and the bot's own fix pushes
+  # (fix-loop guard). In-sync PRs are a cheap no-op: no commit, no push —
+  # the retrigger still runs.
+  openspec-skills-sync:
     if: >-
       github.event.pull_request.head.repo.fork == false &&
       github.actor != 'github-actions[bot]'

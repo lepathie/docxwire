@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_title:
-        description: "PR title to lint (set by the auto-regenerate workflow)"
+        description: "PR title to lint (set by the PR Orchestrator workflow)"
         required: false
         type: string
 
@@ -27,7 +27,7 @@ jobs:
       - name: Lint and test
         run: make ci
 
-  openspec:
+  openspec-validate:
     runs-on: ubuntu-latest
 
     steps:
@@ -69,7 +69,7 @@ jobs:
         run: echo "$PR_TITLE" | ./node_modules/.bin/commitlint
 
   publish-pr-checks:
-    needs: [lint-and-test, openspec, lint-pr-title]
+    needs: [lint-and-test, openspec-validate, lint-pr-title]
     if: github.event_name == 'workflow_dispatch' && always()
     runs-on: ubuntu-latest
     permissions:
@@ -81,7 +81,7 @@ jobs:
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.sha }}
           LINT_AND_TEST: ${{ needs['lint-and-test'].result }}
-          OPENSPEC: ${{ needs.openspec.result }}
+          OPENSPEC_VALIDATE: ${{ needs['openspec-validate'].result }}
           LINT_PR_TITLE: ${{ needs['lint-pr-title'].result }}
         run: |
           mirror() {
@@ -101,5 +101,5 @@ jobs:
               -f "output[summary]=Mirrored from the retriggered CI pipeline run"
           }
           mirror "lint-and-test" "$LINT_AND_TEST"
-          mirror "openspec" "$OPENSPEC"
+          mirror "openspec-validate" "$OPENSPEC_VALIDATE"
           mirror "lint-pr-title" "$LINT_PR_TITLE"

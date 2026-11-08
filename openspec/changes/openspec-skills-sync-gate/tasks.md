@@ -19,7 +19,7 @@
 
 - [x] 4.1 Add `.github/workflows/openspec-regenerate.yaml` (exact text in design.md) and verify it parses: `pull_request` (opened/synchronize/reopened) to `main`, fork + bot-actor guard, `contents: write` + `actions: write`, `head_ref` checkout, scoped `git add .agents/skills`, conventional commit message, and the unconditional retrigger step passing `pr_title`
 - [x] 4.2 Verify the no-op path in a scratch copy of the repo (never the real one): with the generated files in sync, no commit and no push happen, but the retrigger step still dispatches the pipeline with the PR title
-- [ ] 4.3 Verify the fix path live on GitHub: in a scratch PR, bump `@fission-ai/openspec` (or simulate staleness by hand-editing a generated file) and confirm: the regenerate job pushes a bot commit to the PR branch → the pipeline is triggered on the updated head → all three checks (`lint-and-test`, `openspec`, `lint-pr-title`) are green there → the PR is mergeable
+- [x] 4.3 Verify the fix path live on GitHub: in a scratch PR, bump `@fission-ai/openspec` (or simulate staleness by hand-editing a generated file) and confirm: the regenerate job pushes a bot commit to the PR branch → the pipeline is triggered on the updated head → all three checks (`lint-and-test`, `openspec`, `lint-pr-title`) are green there → the PR is mergeable — verified on PR #9 (`renovate/fission-ai-openspec-1.x`, 1.16.0 → 1.16.1): bot commit landed, pipeline retriggered on the fixed head, all three checks green and attributed; the only remaining gate is the repo's own `renovate/stability-days` (7-day `minimumReleaseAge`), which releases the automerge on its schedule
 
 ## 5. Integration
 
@@ -39,6 +39,14 @@
 ## 8. PR check attribution fix (found on first live PRs)
 
 - [x] 8.1 Add a `publish-pr-checks` job to `ci.yaml` that mirrors the three job conclusions (`lint-and-test`, `openspec`, `lint-pr-title`) as explicit check runs on the PR head — `POST /repos/{owner}/{repo}/check-runs` with `head_sha` = the dispatched head SHA and conclusions mapped from `needs['<job>'].result` — because per GitHub's docs, checks from a `workflow_dispatch` run are never attributed to a PR's required checks, while an explicit check-run POST on an open PR's head is
+
+## 9. Wrap-up (cosmetics + risk, found on first merged PR #9)
+
+- [x] 9.1 Rename the workflow to `PR Orchestrator` (file `pr-orchestrator.yaml`) and its job to `openspec-skills-sync`, with a comment explaining the job's role; verify the workflow YAML still parses
+- [x] 9.4 Rename the `openspec` job in `.github/workflows/ci.yaml` to `openspec-validate` and update the `publish-pr-checks` `needs:`/env references; verify the workflow YAML still parses
+- [x] 9.5 Rename the mirrored check to `openspec-validate` in the `publish-pr-checks` job so every PR check line matches a real job name; the branch-protection required entry `openspec` is renamed to `openspec-validate` by the owner in a one-off manual update done in sync with the merge
+- [x] 9.2 Update the `pr_title` input description in `.github/workflows/ci.yaml` to reference the PR Orchestrator workflow
+- [x] 9.3 Record in design.md the suite-folding display decision (the PR UI groups the mirrored CI checks under the workflow's name; the display name is the only safe lever) and the PR #9 risk (bot-fix head: API rollup green and attributed, UI/rollup divergence unexplained, manual rebase the known workaround)
 
 ## Workflow follow-up
 

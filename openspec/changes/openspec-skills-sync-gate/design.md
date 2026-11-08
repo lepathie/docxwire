@@ -2,11 +2,11 @@
 
 ## Context
 
-The `openspec` job in `.github/workflows/ci.yaml` already checks out the repo, sets up Node, runs `npm ci`, and executes `openspec validate --all`. The generated files it guards are `.agents/skills/openspec-*/SKILL.md` plus a `.agents/skills/.openspec-target` marker.
+The `openspec-validate` job in `.github/workflows/ci.yaml` (renamed from `openspec` in the wrap-up) already checks out the repo, sets up Node, runs `npm ci`, and executes `openspec validate --all`. The generated files it guards are `.agents/skills/openspec-*/SKILL.md` plus a `.agents/skills/.openspec-target` marker.
 
 Verified behavior of the OpenSpec CLI (v1.16.0): `openspec update --dry-run --json` prints `{"changes": [...], "notes": [...], "failures": []}` and **exits 0 even when `changes` is non-empty** (i.e. generated files are stale relative to the installed CLI). When in sync, `changes` is an empty array.
 
-Renovate's config automerges qualifying PRs on the platform (`platformAutomerge`), which requires the required status checks to be green on the PR's *latest* head commit. The required set for `main` is `lint-and-test`, `openspec`, and `lint-pr-title`, and it stays that way — so **all three** check runs must land on the (possibly fixed) head commit. Three GitHub behaviors (per the current "Events that trigger workflows" docs) shape this design:
+Renovate's config automerges qualifying PRs on the platform (`platformAutomerge`), which requires the required status checks to be green on the PR's *latest* head commit. The required set for `main` is `lint-and-test`, `openspec-validate`, and `lint-pr-title` — the `openspec` entry is renamed to `openspec-validate` in a one-off manual branch-protection update that lands with this change — so **all three** check runs must land on the (possibly fixed) head commit. Three GitHub behaviors (per the current "Events that trigger workflows" docs) shape this design:
 
 - Check runs are recorded against a run's own `GITHUB_SHA`. For a `workflow_dispatch` with a `ref`, that is the tip of the given branch — so a dispatch on the PR head branch produces check runs on the fixed head commit. A `workflow_run`-triggered run, by contrast, gets the *default branch* as its SHA: the declarative cross-workflow "dependency" provides ordering, but its check runs land on `main` and can never satisfy the PR's required checks — which is why it was considered and rejected.
 - **`workflow_dispatch` check runs are not attributed to the PR** (found on the first live PRs; per the "Troubleshooting required status checks" docs): for a check created by a workflow job to be evaluated for a pull request, the run must be triggered by `push`, `pull_request`, `pull_request_review`, `pull_request_target`, `deployment`, or `deployment_status`. A `workflow_dispatch` on the head branch produces check runs on the right SHA that the PR's checks rollup and branch protection ignore. The remedy is an explicit `POST /repos/{owner}/{repo}/check-runs` with `head_sha` on an open PR's head — that *is* attributed (the pattern is used in the wild, e.g. open-agreements' LLM gate).
@@ -20,7 +20,7 @@ Renovate's config automerges qualifying PRs on the platform (`platformAutomerge`
 - Any PR that leaves the generated OpenSpec files stale fails CI, so drift can never reach `main`.
 - A PR that leaves the files stale (in practice: Renovate's CLI-bump PRs) is auto-healed and remains automerge-able: the fix lands on the PR branch, and the pipeline runs — green — on the updated head.
 - The pipeline runs only after the fix, on the (possibly fixed) head — never on a stale head about to be superseded.
-- The required-checks set stays exactly `{lint-and-test, openspec, lint-pr-title}`; no branch-protection change.
+- The required-checks set keeps exactly three entries: `{lint-and-test, openspec-validate, lint-pr-title}` after the one-off rename of the `openspec` entry — the single branch-protection change in this change, made manually by the owner in sync with the merge.
 
 **Non-Goals:**
 
@@ -33,15 +33,16 @@ Renovate's config automerges qualifying PRs on the platform (`platformAutomerge`
 - **`jq` for the assertion.** Preinstalled on `ubuntu-latest`; more readable than a Node one-liner. If a future runner image dropped `jq`, the step fails loudly (`command not found`) rather than passing silently.
 - **Filter out non-repo paths (`~/**`).** Discovered on the first live run: in a fresh environment (every CI runner) the CLI's first run plans to create its machine-global `~/.config/openspec/config.json` (profile/delivery are machine-global by design — `openspec.dev/docs/profiles`; there is no project-level setting for them, `openspec/config.yaml` carries agent rules only) and reports that as a pending change. Unfiltered, the gate would fail on every run regardless of drift, and the regenerate job's `-gt 0` condition would send every in-sync PR into the fix branch, where `git commit` fails on an empty diff. The sync invariant is about the repo's generated files, so both the gate and the staleness condition count only changes whose path is not a `~`-prefixed global path. This also keeps the gate immune to future CLI changes in out-of-repo first-run behavior.
 - **Only core-config files can be regenerated.** The regenerate job's commit is scoped to `git add .agents/skills`, so the bot commit can only contain the generated skill files; and in a fresh environment the CLI defaults to the `core` profile (exactly the six installed workflows) with a first-run migration that infers `delivery: skills` from the present state. Verified empirically: a real `openspec update` in a fresh environment touches nothing (in sync) or exactly the seven `.agents/skills/**` files (stale) — no command files, no extra workflows.
-- **New step in the existing `openspec` job**, after `Validate OpenSpec artifacts`. Alternative: a separate job — rejected; it would duplicate checkout, Node setup, and `npm ci` for one extra CLI invocation.
+- **New step in the existing `openspec-validate` job**, after `Validate OpenSpec artifacts`. Alternative: a separate job — rejected; it would duplicate checkout, Node setup, and `npm ci` for one extra CLI invocation.
 - **Gate on `changes` only.** Operational errors already fail the step via the CLI's non-zero exit; the assertion adds exactly the sync invariant and nothing else.
-- **The fix lives in its own workflow** (`.github/workflows/openspec-regenerate.yaml`). It needs a writable checkout of the PR head branch, its own `permissions:` block, and a PR-only trigger scope; keeping it out of `ci.yaml` keeps the pipeline file a pure gate. The single cross-file reference in the design is the retrigger line itself — a name reference of the same kind a `workflows: [ … ]` list would be, kept visible in the fix job rather than hidden in a trigger block.
+- **The fix lives in its own workflow** (`.github/workflows/pr-orchestrator.yaml`). It needs a writable checkout of the PR head branch, its own `permissions:` block, and a PR-only trigger scope; keeping it out of `ci.yaml` keeps the pipeline file a pure gate. The single cross-file reference in the design is the retrigger line itself — a name reference of the same kind a `workflows: [ … ]` list would be, kept visible in the fix job rather than hidden in a trigger block.
 - **`GITHUB_TOKEN` with `permissions: contents: write, actions: write`** — never a PAT. A `GITHUB_TOKEN` PR update creates only approval-pending runs, so the fix cannot spawn unattended runs; the explicit dispatch it makes is a `workflow_dispatch` event, which the regenerate workflow does not listen to. Bounded by construction: at most one fix push + one dispatch per stale PR update.
 - **`ci.yaml` drops its `pull_request` trigger and gains a `workflow_dispatch:` with a `pr_title` input** (string, not required). The pipeline's PR runs then happen only via the retrigger, which is what guarantees "fix first, checks second, on the fixed head". The `push: branches: ["main"]` trigger is unchanged.
 - **All three required checks in the single retriggered pipeline.** `lint-pr-title` moves from `commitlint.yaml` into `ci.yaml`, gated on `workflow_dispatch` with a non-empty `pr_title` input; the retrigger passes the PR title as a dispatch input. `commitlint.yaml` retains only its push-to-`main` `lint-commits` job, which remains the enforcement backstop (squash-merge commit message = PR title). Consequence: a PR title *edit* no longer triggers an immediate re-lint (the old `commitlint.yaml` ran on `edited`); the push-to-`main` backstop is unchanged. Alternative considered: dispatch `ci.yaml` **and** `commitlint.yaml` (which would keep the `edited` re-lint) — rejected: two cross-file references and two runs for what is one pipeline.
 - **The retrigger runs for every PR, not just stale ones.** The dispatch is a separate, unconditional final step of the regenerate job (after the conditional fix), passing the PR title. This is what gives normal PRs their pipeline runs — with a stale-only dispatch, an in-sync PR would get no CI at all.
 - **Re-trigger after (or instead of) pushing.** The final step is `gh workflow run ci.yaml --ref <head branch> -f pr_title=<PR title>` (`gh` is preinstalled on `ubuntu-latest`).
-- **Mirror the job conclusions as explicit check runs.** A `publish-pr-checks` job in `ci.yaml` (`needs:` the three check jobs, `if: github.event_name == 'workflow_dispatch' && always()`, `permissions: checks: write`) POSTs one check run per required check — named exactly `lint-and-test`, `openspec`, `lint-pr-title` — with `head_sha` = the run's `GITHUB_SHA` (the dispatched head) and the conclusion mapped from `needs['<job>'].result` (`success`/`failure`/`cancelled`, anything else `skipped`). `always()` keeps it fail-closed: a failed job mirrors a failed check. Only the three mirrored checks appear in the PR's rollup; the run's implicit job checks (unattributed) do not.
+- **Mirror the job conclusions as explicit check runs.** A `publish-pr-checks` job in `ci.yaml` (`needs:` the three check jobs, `if: github.event_name == 'workflow_dispatch' && always()`, `permissions: checks: write`) POSTs one check run per required check — named exactly `lint-and-test`, `openspec-validate`, `lint-pr-title` — with `head_sha` = the run's `GITHUB_SHA` (the dispatched head) and the conclusion mapped from `needs['<job>'].result` (`success`/`failure`/`cancelled`, anything else `skipped`). `always()` keeps it fail-closed: a failed job mirrors a failed check. Only the three mirrored checks appear in the PR's rollup; the run's implicit job checks (unattributed) do not.
+- **Rename the workflow to `PR Orchestrator` (file `pr-orchestrator.yaml`), its job to `openspec-skills-sync`, and the `ci.yaml` job `openspec` to `openspec-validate` (display cosmetics).** The mirrored check runs fold into the head's `pull_request` check suite, so the PR UI groups the mirrored CI checks under the workflow's display name — the low-relevance maintenance job was becoming the visual centrepiece of the PR's checks. The display names are the only safe lever: the mirror cannot target its own attributed suite (a `POST /check-suites` for the head SHA resolves to the existing same-app suite — the *unattributed* `workflow_dispatch` one), and giving `ci.yaml` a `pull_request` trigger (the only way to earn a "CI Pipeline" group label) would undo the "fix first, checks second" decision. A neutral, PR-scoped workflow name keeps the group unobtrusive while the jobs keep specific names. The mirror renames its `openspec` check to `openspec-validate` in the same change, so every PR check line matches a real job name; the required-set entry `openspec` is renamed to `openspec-validate` in a one-off manual branch-protection update (the owner's — the automation token has no admin scope), done in sync with the merge (see Risks).
 - **`gh` gets an explicit `GH_TOKEN`.** On the first live run the retrigger failed with `gh: … set the GH_TOKEN environment variable` — in an Actions run `gh` authenticates from `GH_TOKEN`, and the job's `GITHUB_TOKEN` was not picked up, so `gh` had no token. The step therefore sets `GH_TOKEN: ${{ github.token }}` explicitly (the canonical pattern). That token carries the `actions: write` scope from the job's `permissions:` block, which `gh workflow run` requires to dispatch the pipeline.
 - **Check out `github.head_ref`** in the fix job — the PR branch, not the merge ref — so the commit lands on the branch the PR is tracking.
 - **Skip fork PRs and the bot's own pushes** (`if: … head.repo.fork == false && github.actor != 'github-actions[bot]'`): fork PRs run with a read-only token and cannot be pushed to — Mend-hosted Renovate is a GitHub App creating branches on the origin repo, so its PRs are not fork PRs and are covered; the actor filter stops the approval-pending `synchronize` runs that every fix push creates (see Risks).
@@ -58,12 +59,12 @@ on:
   workflow_dispatch:
     inputs:
       pr_title:
-        description: "PR title to lint (set by the auto-regenerate workflow)"
+        description: "PR title to lint (set by the PR Orchestrator workflow)"
         required: false
         type: string
 ```
 
-the gate step in the `openspec` job:
+the gate step in the `openspec-validate` job:
 
 ```yaml
       - name: Check generated OpenSpec files are in sync
@@ -100,7 +101,15 @@ and the moved title job (verbatim from `commitlint.yaml`, minus its event-name g
 The regenerate workflow as it will read:
 
 ```yaml
-name: OpenSpec Skills Auto-Regenerate
+name: PR Orchestrator
+
+# Orchestrates pull requests to main:
+# - openspec-skills-sync: if the PR leaves the generated OpenSpec skill files
+#   (`.agents/skills/**`) stale — e.g. a Renovate bump of
+#   `@fission-ai/openspec` — regenerate them and push the fix to the PR branch.
+# - Every (non-fork, non-bot) PR run re-triggers the CI pipeline on the
+#   (possibly fixed) head via `gh workflow run` — the only way PRs get their
+#   checks, since ci.yaml runs on explicit dispatch only.
 
 on:
   pull_request:
@@ -108,7 +117,10 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  regenerate:
+  # Skips fork PRs (read-only token) and the bot's own fix pushes
+  # (fix-loop guard). In-sync PRs are a cheap no-op: no commit, no push —
+  # the retrigger still runs.
+  openspec-skills-sync:
     if: >-
       github.event.pull_request.head.repo.fork == false &&
       github.actor != 'github-actions[bot]'
@@ -155,7 +167,9 @@ jobs:
 - [Two PRs bumping the CLI in parallel → merge conflict on the regenerated files] → Resolved at PR merge; rare in a one-person repo.
 - [The auto-fix overwrites in-flight hand edits to generated files on a PR branch] → Intended: the files are CLI-generated and `AGENTS.md` says not to hand-edit them.
 - [`jq` availability on the runner] → Preinstalled on `ubuntu-latest`; failure mode is loud, not silent.
+- [A bot-fix head may need a manual nudge before automerge (observed on PR #9)] → After the fix commit became the head of PR #9, the mirrored check runs were green and attributed per the API (the PR's `statusCheckRollup` reported all SUCCESS), yet the PR UI did not show them green and the automerge did not fire. A manual rebase — any non-bot `pull_request` event — created a fresh `pull_request` check suite on the head, after which the checks showed green and the automerge merged. The exact UI/rollup divergence remains unexplained; hypothesis: a head whose only `pull_request` run is the bot-actor-skipped one does not fully settle in the PR's check rollup. Until the next `@fission-ai/openspec` bump PR proves the loop closes unattended, the known workaround for a stuck PR is a manual rebase or push to the PR branch. Accepted for now; revisit on the next CLI-bump PR.
+- [Cutover window between the check rename and the branch-protection update] → Until the owner renames the required entry `openspec` → `openspec-validate`, PR heads carry checks under the new name that the old required set does not count (and, until the merge, the reverse) — a PR raised in that window cannot merge. The window is a few minutes; accepted for a one-person repo with no open PRs at cutover: merge first, then update the branch settings immediately.
 
 ## Migration Plan
 
-Three workflow files, **no** branch-protection change (the required set is unchanged and is satisfied by the single retriggered pipeline). Deployment is the merge itself; rollback is a revert. The tree is verified in sync with the pinned CLI (Task 1.1), so `main` is green on merge.
+Three workflow files plus a **one-off manual branch-protection update** by the owner (required check `openspec` → `openspec-validate`), done immediately after the merge. Deployment is the merge; rollback is a revert (plus the reverse branch-protection edit). The tree is verified in sync with the pinned CLI (Task 1.1), so `main` is green on merge.
