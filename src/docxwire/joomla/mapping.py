@@ -40,6 +40,7 @@ def build_article_payload(article: Article, settings: JoomlaSettings) -> dict:
         "created_by_alias": article.created_by_alias,
         "metadesc": article.metadesc,
         "metakey": article.metakey,
+        "note": article.note,
         "language": article.language or settings.default_language or ALL_LANGUAGES,
     }
     if article.created_date:

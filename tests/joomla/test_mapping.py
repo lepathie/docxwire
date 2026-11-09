@@ -71,24 +71,43 @@ class TestBodyField:
 
 class TestMetadataCarryOver:
     @pytest.mark.parametrize(
-        ("payload_key", "expected"),
+        ("overrides", "payload_key", "expected"),
         [
-            ("created_by_alias", "Jane Author"),
-            ("metadesc", "A description"),
-            ("metakey", "a, key"),
-            ("language", "*"),
+            # Default fields, carried from the make_article() fixture defaults
+            ({}, "created_by_alias", "Jane Author"),
+            ({}, "metadesc", "A description"),
+            ({}, "metakey", "a, key"),
+            ({}, "language", "*"),
+            ({}, "created", "2026-03-01 12:00:00"),
+            # Explicit overrides: note is not set by the make_article() defaults
+            ({"note": "Prüfe: Titel"}, "note", "Prüfe: Titel"),
+            ({"note": ""}, "note", ""),
+        ],
+        ids=[
+            "carries_default_created_by_alias",
+            "carries_default_metadesc",
+            "carries_default_metakey",
+            "carries_default_language",
+            "carries_default_created_date",
+            "carries_custom_note",
+            "carries_empty_note",
         ],
     )
-    def test_field_carried(self, payload_key: str, expected: object) -> None:
-        payload = build_article_payload(make_article(), make_settings())
+    def test_field_carried(
+        self,
+        overrides: dict[str, object],
+        payload_key: str,
+        expected: object,
+    ) -> None:
+        article = make_article(**overrides)
+        settings = make_settings()
+        payload = build_article_payload(article, settings)
         assert payload[payload_key] == expected
 
-    def test_creation_date_is_carried(self) -> None:
-        payload = build_article_payload(make_article(), make_settings())
-        assert payload["created"] == "2026-03-01 12:00:00"
-
     def test_created_omitted_when_no_date(self) -> None:
-        payload = build_article_payload(make_article(created_date=""), make_settings())
+        article = make_article(created_date="")
+        settings = make_settings()
+        payload = build_article_payload(article, settings)
         assert "created" not in payload
 
 
