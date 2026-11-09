@@ -134,7 +134,7 @@ When the article has lead images, the mapping SHALL emit an `images` object carr
 - **THEN** the payload contains no `images` object
 
 ### Requirement: Article metadata is carried into the payload
-The mapping SHALL carry the article's author alias (`created_by_alias`), metadata description (`metadesc`), metadata keywords (`metakey`), and creation date (`created`) into the create payload, and SHALL set the payload's `language` to the article's language when the article carries one (the `Article` carries an optional `language` field, empty when unset), otherwise to the Joomla settings' `default_language`, and otherwise to the all-languages sentinel `*`.
+The mapping SHALL carry the article's author alias (`created_by_alias`), metadata description (`metadesc`), metadata keywords (`metakey`), creation date (`created`), and review note (`note`) into the create payload, and SHALL set the payload's `language` to the article's language when the article carries one (the `Article` carries an optional `language` field, empty when unset), otherwise to the Joomla settings' `default_language`, and otherwise to the all-languages sentinel `*`.
 
 #### Scenario: Author is carried
 - **WHEN** a payload is built for an article with an extracted author
@@ -147,6 +147,14 @@ The mapping SHALL carry the article's author alias (`created_by_alias`), metadat
 #### Scenario: Creation date is carried
 - **WHEN** a payload is built for an article with a creation date
 - **THEN** the payload's `created` represents that date in a form the API accepts
+
+#### Scenario: The note is carried
+- **WHEN** a payload is built for an article with a review note
+- **THEN** the payload's `note` is the article's note
+
+#### Scenario: A clean article carries an empty note
+- **WHEN** a payload is built for an article whose note is empty
+- **THEN** the payload's `note` is the empty string
 
 #### Scenario: The article's language wins
 - **WHEN** a payload is built for an article whose language is `de-DE`
