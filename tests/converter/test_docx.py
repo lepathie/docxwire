@@ -266,6 +266,8 @@ class TestImageCaptions:
         for img_tag in body_images:
             figure = img_tag.find_parent("figure")
             assert figure is not None
+            assert figure.get("class") == ["image", "align-center"]
+            assert img_tag.get("loading") == "lazy"
             figcaption = figure.find("figcaption")
             assert figcaption is not None
             src = img_tag["src"]
@@ -295,6 +297,8 @@ class TestImageCaptions:
         for img_tag in body_images:
             figure = img_tag.find_parent("figure")
             assert figure is not None
+            assert figure.get("class") == ["image", "align-center"]
+            assert img_tag.get("loading") == "lazy"
             assert figure.find("figcaption") is not None
         assert all(img.is_lead is False for img in article.images)
 
@@ -318,12 +322,13 @@ class TestImageCaptions:
         assert "Beispielbild" not in article.body
         assert BeautifulSoup(article.body, "html.parser").find("img") is None
 
-    def test_inbody_image_without_caption_line_stays_unchanged(
+    def test_inbody_images_without_caption_line_become_figures(
         self, pandoc_media_x, monkeypatch, ruderkurs_doc: Path
     ) -> None:
         # No caption for any image: next block is a heading (x), an image
         # block (y), an empty paragraph (z), a shared image block (w1/w2),
-        # or the image has no src (srcless).
+        # or the image has no src (srcless). Every image is wrapped in a
+        # figure carrying the site's figure class with a lazy img.
         monkeypatch.setattr(
             "pypandoc.convert_file",
             MagicMock(
@@ -340,14 +345,91 @@ class TestImageCaptions:
         article = DocxConverter().convert(ruderkurs_doc)
         soup = BeautifulSoup(article.body, "html.parser")
         assert article.images[0].caption == ""
-        assert soup.find("figure") is None
         for name in ("x.jpg", "y.jpg", "z.jpg", "w1.jpg", "w2.jpg"):
             img = soup.find("img", src=f"media/{name}")
             assert img is not None
-            parent = img.parent
-            assert parent is not None
-            assert parent.name == "p"
-        assert any(img.get("src") is None for img in soup.find_all("img"))
+            figure = img.find_parent("figure")
+            assert figure is not None
+            assert figure.get("class") == ["image", "align-center"]
+            assert img.get("loading") == "lazy"
+            assert figure.find("figcaption") is None
+        srcless = next(img for img in soup.find_all("img") if img.get("src") is None)
+        figure = srcless.find_parent("figure")
+        assert figure is not None
+        assert figure.get("class") == ["image", "align-center"]
+        assert srcless.get("loading") == "lazy"
+        figcaption = figure.find("figcaption")
+        assert figcaption is not None
+        assert figcaption.get_text() == "Unterschrift ohne Quelle"
+
+    def test_inbody_image_without_caption_line_becomes_captionless_figure(
+        self, pandoc_media_x, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                # The image ends the document: no line below it, so no
+                # caption line.
+                return_value="<h1>Titel</h1><p><img src='media/x.jpg'></p>"
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        soup = BeautifulSoup(article.body, "html.parser")
+        figure = soup.find("figure")
+        assert figure is not None
+        assert figure.get("class") == ["image", "align-center"]
+        assert figure.find("figcaption") is None
+        img = figure.find("img")
+        assert img is not None
+        assert img["src"] == "media/x.jpg"
+        assert img.get("loading") == "lazy"
+
+    def test_inbody_img_stripping_of_styling_attributes(
+        self, pandoc_media_x, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1>"
+                    "<p><img src='media/x.jpg' class='fancy' style='color: red'"
+                    " width='100' height='50'></p>"
+                    "<p>Fliesstext</p>"
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        soup = BeautifulSoup(article.body, "html.parser")
+        img = soup.find("img")
+        assert img is not None
+        assert set(img.attrs) == {"src", "loading"}
+        assert img["src"] == "media/x.jpg"
+        assert img["loading"] == "lazy"
+
+    def test_shared_block_with_two_images_becomes_one_figure_per_image(
+        self, pandoc_media_xyz, monkeypatch, ruderkurs_doc: Path
+    ) -> None:
+        monkeypatch.setattr(
+            "pypandoc.convert_file",
+            MagicMock(
+                return_value=(
+                    "<h1>Titel</h1>"
+                    "<p><img src='media/x.jpg'><img src='media/y.jpg'></p>"
+                    "<p>Fliesstext</p>"
+                )
+            ),
+        )
+        article = DocxConverter().convert(ruderkurs_doc)
+        soup = BeautifulSoup(article.body, "html.parser")
+        figures = soup.find_all("figure")
+        assert len(figures) == 2
+        for figure, name in zip(figures, ("x.jpg", "y.jpg")):
+            assert figure.get("class") == ["image", "align-center"]
+            assert figure.find("figcaption") is None
+            img = figure.find("img")
+            assert img is not None
+            assert img["src"] == f"media/{name}"
+            assert img.get("loading") == "lazy"
 
     def test_inbody_plain_caption_line_becomes_figure_with_captured_caption(
         self, pandoc_media_x, monkeypatch, ruderkurs_doc: Path

@@ -11,6 +11,7 @@ from xml.etree import ElementTree
 
 import pypandoc
 from bs4 import BeautifulSoup, Tag
+from bs4.element import AttributeValueList
 
 from docxwire.converter.base import (
     AbstractConverter,
@@ -23,6 +24,7 @@ from docxwire.converter.base import (
 
 _HEADING_RE = re.compile(r"^h[1-6]$")
 _CAPTION_STYLE = "Bildunterschrift"
+_FIGURE_CLASSES = ("image", "align-center")
 _CORE_CREATED_TAG = "{http://purl.org/dc/terms/}created"
 _AUTOR_STYLE = "Autor"
 _AUTOR_LABEL_RE = re.compile(r"^Autor:\s*")
@@ -63,6 +65,22 @@ def _is_caption_candidate(block: Tag | None) -> TypeGuard[Tag]:
         return True
     children = block.find_all(True, recursive=False)
     return block.name == "div" and len(children) == 1 and children[0].name == "p"
+
+
+def _figure_for_image(soup: BeautifulSoup, img: Tag) -> Tag:
+    """Return a new ``<figure class="image align-center">`` for *img*.
+
+    Styling attributes (``class``, ``style``, ``width``, ``height``) are
+    stripped before ``loading="lazy"`` is set, so the final attribute set
+    is exactly ``src`` plus ``loading``. The caller places the figure in
+    the body and then moves the image into it.
+    """
+    figure = soup.new_tag("figure")
+    figure.attrs["class"] = AttributeValueList(_FIGURE_CLASSES)
+    for attr in ("class", "style", "width", "height"):
+        img.attrs.pop(attr, None)
+    img["loading"] = "lazy"
+    return figure
 
 
 def _apply_image_captions(images: list[Image], captions: dict[str, str]) -> None:
@@ -290,34 +308,57 @@ class DocxConverter(AbstractConverter):
                 title = fallback_title
                 note_builder.add(NoteItem.TITLE)
 
-            # In-body images with a caption line directly below are rewritten
-            # in place as <figure> with a <figcaption>; the caption text is
-            # captured the same way as for lead images.
+            # Every in-body image is rewritten in place as a <figure>
+            # carrying the site's figure class; a caption line directly
+            # below it becomes a <figcaption> and is captured the same way
+            # as for lead images. Shared blocks (several images in one
+            # block) are split into one figure per image, in document
+            # order, without figcaptions.
+            processed_blocks: set[Tag] = set()
             for img in soup.find_all("img"):
                 block = _top_level_block(img, soup)
-                if len(block.find_all("img")) > 1:
-                    # Shared block: left untouched so no image is lost.
+                if block in processed_blocks:
                     continue
+                processed_blocks.add(block)
+                block_imgs = block.find_all("img")
+                if len(block_imgs) > 1:
+                    # Shared block: per-image caption attribution is
+                    # ambiguous, so no figcaption is created and a
+                    # following caption line stays a plain paragraph.
+                    anchor = block
+                    for block_img in block_imgs:
+                        figure = _figure_for_image(soup, block_img)
+                        anchor.insert_after(figure)
+                        figure.append(block_img.extract())
+                        anchor = figure
+                        # Mark the figure processed so the image it now
+                        # holds is not handled a second time below.
+                        processed_blocks.add(figure)
+                    block.decompose()
+                    continue
+                # The caption line must be read before the figure is
+                # inserted: it is the block's next sibling.
                 caption = _next_block_sibling(block)
-                if not _is_caption_candidate(caption):
-                    continue
-                img_src = img.get("src")
-                if not img_src:
-                    continue
-                img_src = str(img_src)
-                styled = caption.get("data-custom-style") == _CAPTION_STYLE
-                text = caption.get_text().strip()
-                figure = soup.new_tag("figure")
+                figure = _figure_for_image(soup, img)
                 block.insert_after(figure)
                 figure.append(img.extract())
-                figcaption = soup.new_tag("figcaption")
-                figcaption.string = text
-                figure.append(figcaption)
-                block.decompose()
-                caption.decompose()
-                captions[img_src] = text
-                if not styled:
-                    guessed_srcs.append(img_src)
+                # A block that is the image itself was emptied by the
+                # extract; only wrap-paragraph blocks need decomposing.
+                if block is not img:
+                    block.decompose()
+                if _is_caption_candidate(caption):
+                    styled = caption.get("data-custom-style") == _CAPTION_STYLE
+                    text = caption.get_text().strip()
+                    figcaption = soup.new_tag("figcaption")
+                    figcaption.string = text
+                    figure.append(figcaption)
+                    caption.decompose()
+                    img_src = img.get("src")
+                    if img_src:
+                        img_src = str(img_src)
+                        captions[img_src] = text
+                        if not styled:
+                            guessed_srcs.append(img_src)
 
             images: list[Image] = []
             media_path = Path(media_dir)
