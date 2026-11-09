@@ -8,6 +8,8 @@ joomla-client change's design, "Verified contract").
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from bs4 import BeautifulSoup
 
 from docxwire.converter.base import Article
@@ -61,13 +63,16 @@ def build_article_payload(article: Article, settings: JoomlaSettings) -> dict:
 def _rewrite_body_images(article: Article) -> str:
     """Rewrite every body ``<img src>`` to the image's uploaded path.
 
-    The lookup is exact: pandoc's ``src`` equals
-    :attr:`Image.media_filename`. A body image without a populated
-    ``upload_path`` raises, so a payload never ships with a dead
-    reference.
+    The lookup is by the media file's basename: pandoc's ``src`` is
+    normally :attr:`Image.media_filename` (``media/<file>``), but for some
+    documents it is path-carrying (observed: absolute paths into pandoc's
+    temporary media-extraction directory), and the basename is the identity
+    the converter uses for lead flagging, captions, and ordering. A body
+    image without a populated ``upload_path`` raises, so a payload never
+    ships with a dead reference.
     """
     mapping = {
-        image.media_filename: image.upload_path
+        Path(image.media_filename).name: image.upload_path
         for image in article.images
         if image.upload_path
     }
@@ -77,7 +82,7 @@ def _rewrite_body_images(article: Article) -> str:
         return article.body
     for img in imgs:
         src = img.get("src")
-        if not isinstance(src, str) or src not in mapping:
+        if not isinstance(src, str) or Path(src).name not in mapping:
             raise ValueError(f"Body image {src!r} has no upload path")
-        img["src"] = mapping[src]
+        img["src"] = mapping[Path(src).name]
     return soup.decode()

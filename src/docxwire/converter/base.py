@@ -30,6 +30,22 @@ def slugify(text: str) -> str:
     return text
 
 
+_SLUG_DATE_RE = re.compile(r"-(\d{4})-(\d{2})$")
+
+
+def slug_date(slug: str) -> str:
+    """Return the trailing ``-YYYY-MM`` date of *slug* as ``YYYY/MM``,
+    or ``""`` when the slug has no such suffix.
+
+    :func:`slugify` moves a leading date prefix to exactly this trailing
+    position, so the slug carries the document's file-name date.
+    """
+    m = _SLUG_DATE_RE.search(slug)
+    if m is None:
+        return ""
+    return f"{m.group(1)}/{m.group(2)}"
+
+
 @dataclass
 class Image:
     """Single article image."""

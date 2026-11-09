@@ -58,14 +58,22 @@ output behavior in `cli.py` (invoked in-process), flow behavior in
 
 ### 3. Image path derivation lives in `publish.py`
 
-For each image: rel-path `articles/<YYYY>/<MM>/<slug>/<media_filename>`,
-where `<YYYY>-<MM>` is the date part of `Article.created_date` (its first ten
-characters) or, when the article has no created date, the current local date.
-`Image.upload_path` is set to `/images/<rel-path>` for **every** image before
-`build_article_payload` runs — the mapping's body-rewrite and `images` object
-both read those values, and all images upload so an editor can swap the lead
-later. The media upload itself uses the rel-path (the client prefixes the
-images adapter).
+For each image: rel-path `articles/<YYYY>/<MM>/<slug>/<filename>`, where
+`<filename>` is the **basename** of `Image.media_filename`
+(`Path(...).name`) — pandoc's `--extract-media` writes images under a
+`media/` subdirectory and that layout must not leak into the site path.
+`<YYYY>/<MM>` is the article's **slug date** — the trailing `-YYYY-MM` of
+the slug (`slugify` moves the file name's leading date prefix to exactly
+this position), read by a `slug_date` helper next to `slugify` in
+`converter/base.py` — falling back to the date part of
+`Article.created_date` (its first seven characters), then to the current
+local date. The title is **not** consulted: it is the first heading,
+which usually carries no date (observed: `„Adams Acht" – …` titled from
+the heading while the file name — and thus the slug — carries `2026.09`). `Image.upload_path` is set to `/images/<rel-path>` for
+**every** image before `build_article_payload` runs — the mapping's
+body-rewrite and `images` object both read those values, and all images
+upload so an editor can swap the lead later. The media upload itself uses
+the rel-path (the client prefixes the images adapter).
 
 ### 4. Output shape
 
@@ -83,6 +91,20 @@ argument → file-exists check → settings load → convert → upload all imag
 create article. File and settings checks happen before any conversion or
 network activity, per the spec.
 
+### 6. Body image references match by basename
+
+`_rewrite_body_images` matches each body `<img src>` to an image by the
+media file's **basename**, not the exact `media_filename` string: for some
+documents pandoc writes body references as path-carrying — observed as
+absolute paths into its temporary media-extraction directory
+(`/tmp/media-XXXX/media/image1.jpeg`) — which an exact match cannot
+resolve, crashing the run with a raw `ValueError` traceback. The basename
+is the identity the converter already uses for lead flagging, caption
+capture, and image ordering, so this aligns the mapping with it. A `src`
+whose basename matches no image with an upload path still fails the build;
+the CLI's exception mapping covers that failure, so it reports
+`error: …` like any other operational failure.
+
 ## Risks / Trade-offs
 
 - **Re-running the same document** may hit an alias collision (or create a
@@ -97,6 +119,9 @@ network activity, per the spec.
 - **pandoc failures** surface as the converter's `RuntimeError` with a
   `conversion of <file> failed:` prefix → already actionable; the CLI passes
   it through.
+- **The slug date is author-typed** (via the file name): a mistyped prefix
+  files the images in the wrong month → cosmetic folder organization only,
+  caught in the draft review; accepted.
 
 ## Open Questions
 

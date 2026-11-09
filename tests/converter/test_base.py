@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from docxwire.converter.base import NoteBuilder, NoteItem, slugify
+from docxwire.converter.base import NoteBuilder, NoteItem, slug_date, slugify
 
 
 class TestNoteBuilder:
@@ -48,3 +48,17 @@ class TestSlugify:
     )
     def test_formats_correctly(self, filename: str, expected: str) -> None:
         assert slugify(filename) == expected
+
+
+class TestSlugDate:
+    @pytest.mark.parametrize(
+        "slug, expected",
+        [
+            ("adams-acht-2026-09", "2026/09"),
+            ("ruderkurs-2025-04", "2025/04"),
+            ("regatta", ""),
+            ("regatta-2026-03-15", ""),
+        ],
+    )
+    def test_extracts_trailing_date_suffix(self, slug: str, expected: str) -> None:
+        assert slug_date(slug) == expected

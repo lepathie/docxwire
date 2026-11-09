@@ -68,19 +68,32 @@ article SHALL be left in the site's default state (draft).
   create payload carrying no explicit state
 
 ### Requirement: Image paths are derived from the article
-Each image SHALL be uploaded to `images/articles/<YYYY>/<MM>/<slug>/<media
-filename>` on the site, where `<YYYY>/<MM>` is the article's created date and
-`<slug>` is the article's slug; when the article has no created date, the
-current date SHALL be used. The article body's image references SHALL point
-to the corresponding site-relative uploaded paths.
+Each image SHALL be uploaded to `images/articles/<YYYY>/<MM>/<slug>/<filename>`
+on the site, where `<filename>` is the media file's basename (no directory
+components — in particular, no pandoc `media/` extraction prefix), `<slug>`
+is the article's slug, and `<YYYY>/<MM>` is the article's folder date. The
+article body's image references SHALL point to the corresponding
+site-relative uploaded paths.
 
-#### Scenario: The created date drives the path
-- **WHEN** an article with a created date in March 2026 is published
-- **THEN** its images are uploaded under `images/articles/2026/03/<slug>/…`
+#### Scenario: The slug date drives the path
+- **WHEN** an article with the slug `adams-acht-2026-09` and a dateless
+  title is published
+- **THEN** its images are uploaded under `images/articles/2026/09/<slug>/…`
   and its body references the corresponding site-relative paths
 
+#### Scenario: A media extraction prefix is not part of the path
+- **WHEN** an article's image has the media file name `media/image1.jpeg`
+- **THEN** it is uploaded under `images/articles/<YYYY>/<MM>/<slug>/image1.jpeg`
+  with no `media` component, and the body reference points to that path
+
+#### Scenario: A dateless slug falls back to the created date
+- **WHEN** an article whose slug has no date suffix and whose created date
+  is in March 2026 is published
+- **THEN** its images are uploaded under `images/articles/2026/03/<slug>/…`
+
 #### Scenario: A missing created date falls back to the current date
-- **WHEN** an article without a created date is published
+- **WHEN** an article with a dateless slug and no created date is
+  published
 - **THEN** its images are uploaded under the current date's
   `images/articles/<YYYY>/<MM>/…` path
 
@@ -101,9 +114,9 @@ indication that nothing needs review when the note is empty — and SHALL exit
   nothing needs review, and the command exits 0
 
 ### Requirement: Failures stop the run without publishing
-When settings loading, conversion, an image upload, or the article creation
-fails, the command SHALL report an actionable error and SHALL exit non-zero,
-and no article SHALL be created for the run.
+When settings loading, conversion, an image upload, the article creation,
+or the payload build fails, the command SHALL report an actionable error
+and SHALL exit non-zero, and no article SHALL be created for the run.
 
 #### Scenario: An image upload failure stops the run
 - **WHEN** an image upload fails with an API error
@@ -114,3 +127,9 @@ and no article SHALL be created for the run.
 - **WHEN** converting the document fails
 - **THEN** an actionable error is reported, the command exits non-zero, and
   no image is uploaded and no article is created
+
+#### Scenario: A payload-build failure stops the run
+- **WHEN** building the article payload fails (for example a body image
+  reference matches no uploaded image)
+- **THEN** an actionable error is reported, the command exits non-zero, and
+  no article is created

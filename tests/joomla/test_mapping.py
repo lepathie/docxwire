@@ -152,6 +152,34 @@ class TestBodyImageRewrite:
         with pytest.raises(ValueError):
             build_article_payload(article, make_settings())
 
+    def test_absolute_temp_path_reference_matched_by_basename(self) -> None:
+        # Pandoc writes some body references as absolute paths into its
+        # temporary media-extraction directory.
+        article = make_article(
+            body='<p><img src="/tmp/media-a9visq6k/media/image1.jpeg"></p>',
+            images=[
+                make_image(
+                    media_filename="media/image1.jpeg",
+                    upload_path="/images/articles/2026/07/test-title/image1.jpeg",
+                )
+            ],
+        )
+        payload = build_article_payload(article, make_settings())
+        soup = BeautifulSoup(payload["introtext"], "html.parser")
+        img = soup.find("img")
+        assert img is not None
+        assert img["src"] == "/images/articles/2026/07/test-title/image1.jpeg"
+
+    def test_unmatched_basename_fails_build(self) -> None:
+        article = make_article(
+            body='<p><img src="/tmp/media-a9visq6k/media/other.jpeg"></p>',
+            images=[
+                make_image(upload_path="/images/articles/2026/07/test-title/image1.png")
+            ],
+        )
+        with pytest.raises(ValueError):
+            build_article_payload(article, make_settings())
+
 
 class TestImagesObject:
     def test_lead_image_carried_in_both_slots(self) -> None:

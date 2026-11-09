@@ -23,6 +23,9 @@ dependencies = [
     "requests>=2.34.2",
 ]
 
+[project.scripts]
+docxwire = "docxwire.cli:main"
+
 [dependency-groups]
 dev = [
     "ty>=0.0.89",

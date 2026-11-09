@@ -15,11 +15,18 @@ drives the existing parts end to end — the tool's first runnable form.
   `settings.toml` in the current working directory → `DocxConverter.convert`
   → upload every article image via the Media API → `build_article_payload` →
   `JoomlaClient.create_article`.
-- Image target-path derivation: `articles/<YYYY>/<MM>/<slug>/<basename>` under
-  the site's `images/` tree (i.e. `Image.upload_path` =
-  `/images/articles/…`), with `<YYYY>/<MM>` taken from the article's created
-  date and falling back to the current day when the article has none — the same
-  date the site then fills into the article's `created` field.
+- Image target-path derivation: `articles/<YYYY>/<MM>/<slug>/<filename>`
+  under the site's `images/` tree (i.e. `Image.upload_path` =
+  `/images/articles/…`), where `<filename>` is the media file's basename
+  (pandoc's `media/` extraction prefix is not part of the path) and
+  `<YYYY>/<MM>` is the article's slug date (the trailing `-YYYY-MM` of the
+  slug, which the converter derives from the document's file name), falling
+  back to the article's created date, then the current day.
+- Robust body-image matching: the payload builder matches each body `<img>`
+  reference to an image by the media file's basename, so pandoc's
+  path-carrying references (e.g. absolute paths into its temporary
+  media-extraction directory) are rewritten correctly; a reference matching
+  no uploaded image fails the run with an actionable error, not a traceback.
 - The command reports the created article's id and the review note
   (`Prüfe: …`, or that nothing needs review) and exits 0; settings,
   conversion, and API failures print an actionable message and exit non-zero.
@@ -38,15 +45,20 @@ drives the existing parts end to end — the tool's first runnable form.
 
 ### Modified Capabilities
 
-(None)
+- `joomla-client`: "The payload's body image references point to uploaded
+  media" — body references are matched by the media file's basename instead
+  of the exact `media_filename` string.
 
 ## Impact
 
 - **Code:** new `src/docxwire/cli.py` (entry point, argument parsing,
-  reporting) and a new orchestration module (e.g. `src/docxwire/pipeline.py`);
-  a `[project.scripts]` entry in `pyproject.toml`.
+  reporting) and a new orchestration module (`src/docxwire/publish.py`);
+  a `[project.scripts]` entry in `pyproject.toml`; a title-date helper in
+  `src/docxwire/converter/base.py`; basename matching in
+  `src/docxwire/joomla/mapping.py`.
 - **Tests:** new tests for the CLI and the pipeline (settings loading,
-  path derivation, upload-then-create ordering, output, exit codes).
+  path derivation, upload-then-create ordering, output, exit codes);
+  title-date helper tests; body-reference matching tests.
 - **Dependencies:** none (`argparse` is stdlib).
 - **Out of scope** (follow-up changes): `--config` / nearest-config-file
   discovery, folder batch with multi-document output, `--dry-run`, direct
