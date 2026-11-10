@@ -23,6 +23,9 @@ dependencies = [
     "requests>=2.34.2",
 ]
 
+[project.optional-dependencies]
+build = ["uv>=0.13.4"]
+
 [project.scripts]
 docxwire = "docxwire.cli:main"
 
@@ -43,6 +46,16 @@ addopts = "--cov-fail-under=100"
 extensions.front-matter.enabled = true
 plugins.md013.enabled = false
 system.exclude_path = ["openspec", ".agents/skills/openspec-*"]
+
+[tool.semantic_release]
+branch = "main"
+allow_zero_version = true
+version_toml = ["pyproject.toml:project.version"]
+build_command = """
+pip install -e '.[build]'
+uv lock --upgrade-package "$PACKAGE_NAME"
+git add uv.lock
+"""
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14"]

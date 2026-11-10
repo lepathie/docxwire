@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    branches: ["main"]
+
+# Default: least-privileged permissions across all jobs
+permissions:3
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    # Prevents a race between two release jobs on rapid successive pushes
+    concurrency:
+      group: ${{ github.workflow }}-release-${{ github.ref_name }}
+      cancel-in-progress: false
+
+    permissions:
+      contents: write
+
+    steps:
+      # Check out the repository at the branch that triggered the workflow.
+      # PSR converts the shallow clone to a full clone automatically if needed.
+      - name: Setup | Checkout repository on release branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.ref_name }}
+
+      # Force the release branch to the workflow sha: the branch may have
+      # moved while the run is in flight, which must not be released.
+      - name: Setup | Force release branch to workflow sha
+        run: git reset --hard ${{ github.sha }}
+
+      - name: Action | Semantic version release
+        uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_committer_name: "github-actions"
+          git_committer_email: "actions@users.noreply.github.com"
