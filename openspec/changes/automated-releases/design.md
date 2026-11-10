@@ -58,16 +58,17 @@ optional-dependencies extra (`pip install -e '.[build]'`); pinning `uv`
 there lets Renovate keep it current. No `uv build` step — no distribution
 artifacts are built.
 
-### 4. Manual `v0.1.0` baseline, hand-written changelog seed
+### 4. Manual `v0.1.0` baseline; PSR generates the changelog
 
-No tag history exists, so an auto-generated first release would dump the
-repo's entire history into the notes. `v0.1.0` is cut manually (tag +
-GitHub release) and `CHANGELOG.md` is seeded with a hand-written `0.1.0`
-entry shaped like what PSR generates later (`## [0.1.0] - <date>` heading,
-`### Features` grouping), so the file has one style. **Sequencing
-constraint:** the `v0.1.0` tag must exist on `main` before the first
-`feat`/`fix` push after the release workflow is active — otherwise PSR
-computes the first version from the full history.
+`v0.1.0` is cut manually (tag + GitHub release with the agreed notes)
+before the workflow is armed. `CHANGELOG.md` is not seeded: PSR's default
+init mode generates it from the git history at the first automated release,
+and `mask_initial_release` (the default) renders the very first release as
+a one-line "Initial Release" — so no full-history dump lands in the file
+and no hand-maintained seed can drift from the generated entries.
+**Sequencing constraint:** the `v0.1.0` tag must exist on `main` before
+the first `feat`/`fix` push after the release workflow is active —
+otherwise PSR computes the first version from the full history.
 
 ### 5. The pipeline-arming commit is `chore(release)`, not `feat`
 
