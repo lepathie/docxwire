@@ -39,6 +39,33 @@ make lint-commit       # Validate a commit message (piped via stdin)
 make openspec-validate # Validate OpenSpec artifacts
 ```
 
+## Usage
+
+`docxwire` publishes a single `.docx` document to the configured Joomla 5 site: it converts the document, uploads its images, and creates a draft article that a reviewer publishes from the Joomla backend.
+
+Before the first run, create the (gitignored) settings file and fill in your site's values:
+
+```bash
+cp settings.toml.example settings.toml
+```
+
+Then, from the folder holding `settings.toml`, publish a document:
+
+```bash
+uv run docxwire "path/to/article.docx"
+```
+
+The command takes exactly one argument — the document to publish — and no other options. On success it prints the created draft's id and its review note:
+
+```console
+Created draft article 509: „Adams Acht“ – Ein Ruderabend im Kino
+Nothing to review.
+```
+
+Each image is uploaded to `images/articles/<YYYY>/<MM>/<slug>/<file>` on the site, where `<YYYY>/<MM>` is the article's date.
+
+**Exit codes:** `0` success · `1` operational failure (settings, conversion, or API — an actionable message is printed) · `2` usage error.
+
 ## Spec-driven development
 
 Features are specified with [OpenSpec](https://openspec.dev) before they are built: proposals, designs, and task lists live in [`openspec/`](openspec/), and agent workflow rules in [`AGENTS.md`](AGENTS.md). The OpenSpec workflow skills are committed to the repo (`.agents/skills/openspec-*/`), and the artifacts are validated in CI with the OpenSpec CLI. The CLI version is declared in [`package.json`](package.json) and installed by `make setup`; validate locally with `make openspec-validate`. If you want the bare `openspec` command on your `PATH` (e.g. to (re)generate the workflow skills with `openspec update`), optionally install the pinned version globally with `npm install -g @fission-ai/openspec@<version from package.json>`.
