@@ -7,9 +7,19 @@ name: PR Orchestrator
 #   `package.json` (below the locked dependency tree's strictest minimum) —
 #   regenerate / bump them and push the fix to the PR branch (named after
 #   Renovate's postUpgradeTasks, which this replaces for our workflows).
-# - Every (non-fork, non-bot) PR run re-triggers the CI pipeline on the
-#   (possibly fixed) head via `gh workflow run` — the only way PRs get their
-#   checks, since ci.yaml runs on explicit dispatch only.
+#   Skips fork PRs (read-only token) and the bot's own fix pushes
+#   (fix-loop guard). A run that pushed a fix does NOT re-trigger CI: the
+#   re-trigger is deferred to the synchronize run its push triggers.
+# - retrigger-ci: runs for the bot's own fix pushes and re-triggers the CI
+#   pipeline on the PR branch.
+# - Placement rule: the re-trigger always happens in the LAST orchestrator
+#   run for a PR head (an in-sync run, or the run started by the bot's own
+#   fix push). The PR's checks view is bound to the check suite created by
+#   the pull_request event, and the re-triggered CI's check runs only land
+#   in that suite while it is still open — dispatching it from an earlier
+#   run (for the old head) orphaned the checks, invisible on the PR.
+#   This is the only way PRs get their checks, since ci.yaml runs on
+#   explicit dispatch only.
 
 on:
   pull_request:
@@ -19,7 +29,7 @@ on:
 jobs:
   # Skips fork PRs (read-only token) and the bot's own fix pushes
   # (fix-loop guard). In-sync PRs are a cheap no-op: no commit, no push —
-  # the retrigger still runs.
+  # the re-trigger still runs.
   post-upgrade-tasks:
     if: >-
       github.event.pull_request.head.repo.fork == false &&
@@ -38,7 +48,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Regenerate if stale
+      - id: regenerate
+        name: Regenerate if stale
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
@@ -49,8 +60,10 @@ jobs:
             git add .agents/skills
             git commit -m "chore(openspec): regenerate workflow skills"
             git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Bump `engines.node` if stale
+      - id: bump
+        name: Bump `engines.node` if stale
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
@@ -61,8 +74,31 @@ jobs:
             git add package.json
             git commit -m "chore(deps): bump engines.node to dependency tree floor"
             git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
           fi
+      # Only when this run pushed no fix: a fix push defers the re-trigger
+      # to the synchronize run it triggers (see retrigger-ci).
       - name: Re-trigger CI on the (possibly fixed) head
+        if: ${{ steps.regenerate.outputs.pushed != 'true' && steps.bump.outputs.pushed != 'true' }}
+        env:
+          BRANCH: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yaml --ref "$BRANCH" -f "pr_title=$PR_TITLE"
+
+  # The last run for the new head: the re-trigger is dispatched while the
+  # new head's pull_request event suite is still open, so the CI check runs
+  # land in the suite the PR's checks view is bound to. No checkout needed —
+  # the branch name and PR title come from the event payload.
+  retrigger-ci:
+    if: >-
+      github.event.pull_request.head.repo.fork == false &&
+      github.actor == 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write # re-trigger the pipeline via `gh workflow run`
+    steps:
+      - name: Re-trigger CI on the (fixed) head
         env:
           BRANCH: ${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
