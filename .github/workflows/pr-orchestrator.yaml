@@ -103,4 +103,7 @@ jobs:
           BRANCH: ${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           GH_TOKEN: ${{ github.token }}
+          # No checkout in this job: gh cannot infer the repository from the
+          # working directory, so point it at the event's repository.
+          GH_REPO: ${{ github.repository }}
         run: gh workflow run ci.yaml --ref "$BRANCH" -f "pr_title=$PR_TITLE"
