@@ -16,7 +16,7 @@
 ## 3. Verification
 
 - [x] 3.1 Both workflow files parse as valid YAML; walk the trigger matrix: (a) human PR → native `ci.yaml` run, no orchestrator re-trigger; (b) bot fix push → `synchronize` → native `ci.yaml` run on the fixed head, `post-upgrade-tasks` skipped; (c) fork PR → native CI runs, `post-upgrade-tasks` skipped
-- [ ] 3.2 On the next PR (e.g. the next Renovate bump), verify the PR shows native checks and, if the orchestrator pushes a fix, the fixed head is checked natively with no `retrigger-ci` job
+- [x] 3.2 On the next PR (e.g. the next Renovate bump), verify the PR shows native checks and, if the orchestrator pushes a fix, the fixed head is checked natively with no `retrigger-ci` job
 
 ## Workflow follow-up
 
