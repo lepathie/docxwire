@@ -30,7 +30,7 @@ contains the loader also contains its only entry point.
 
 ## Decisions
 
-1. **Namespaced `DOXXWIRE_JOOMLA_*` variable names.** The prefix mirrors the
+1. **Namespaced `DOCXWIRE_JOOMLA_*` variable names.** The prefix mirrors the
    `[joomla]` section and keeps the variables unambiguous in a function app
    environment that carries many unrelated variables (Azure injects dozens of
    `AWS_*`/`Azure*`/`FUNCTIONS_*` variables). Alternatives: unprefixed
@@ -75,7 +75,7 @@ contains the loader also contains its only entry point.
   convention) → deliberate: an automation capturing stdout gets the error in
   the same place as the success object; the non-zero exit code separates the
   cases.
-- **Env pollution** (a stray `DOXXWIRE_JOOMLA_*` variable in the host
+- **Env pollution** (a stray `DOCXWIRE_JOOMLA_*` variable in the host
   environment) → the namespaced prefix makes accidental collision
   implausible; the function app's settings are explicitly managed.
 

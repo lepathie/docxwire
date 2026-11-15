@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from docxwire.converter import DocxConverter
-from docxwire.settings import SettingsError, load_settings
+from docxwire.settings import SettingsError, load_settings, load_settings_from_env
 
 VALID_SETTINGS = """\
 [joomla]
@@ -18,6 +18,28 @@ base_path = "/index.php/api/index.php"
 token = "test-token"
 default_catid = 7
 """
+
+JOOMLA_ENV_KEYS = (
+    "base_url",
+    "base_path",
+    "basic_auth",
+    "token",
+    "default_catid",
+    "default_language",
+)
+
+
+@pytest.fixture
+def clear_joomla_env(monkeypatch) -> None:
+    """Remove any inherited DOCXWIRE_JOOMLA_* variables."""
+    for key in JOOMLA_ENV_KEYS:
+        monkeypatch.delenv(f"DOCXWIRE_JOOMLA_{key.upper()}", raising=False)
+
+
+def set_joomla_env(monkeypatch, **values: str) -> None:
+    """Set the given ``DOCXWIRE_JOOMLA_*`` variables (keyed by setting name)."""
+    for key, value in values.items():
+        monkeypatch.setenv(f"DOCXWIRE_JOOMLA_{key.upper()}", value)
 
 
 @pytest.fixture
@@ -212,6 +234,104 @@ def test_load_settings_with_default_language_loaded_verbatim(
     settings = load_settings(path)
 
     assert settings.joomla.default_language == "de-DE"
+
+
+def test_load_settings_from_env_with_all_variables_preserves_values(
+    monkeypatch, clear_joomla_env
+) -> None:
+    set_joomla_env(
+        monkeypatch,
+        base_url="https://example.org",
+        base_path="/api/index.php/v1",
+        token="env-token",
+        default_catid="7",
+        basic_auth="b64_encoded",
+        default_language="de-DE",
+    )
+
+    settings = load_settings_from_env()
+
+    assert settings.joomla.base_url == "https://example.org"
+    assert settings.joomla.base_path == "/api/index.php/v1"
+    assert settings.joomla.token == "env-token"
+    assert settings.joomla.default_catid == 7
+    assert settings.joomla.basic_auth == "b64_encoded"
+    assert settings.joomla.default_language == "de-DE"
+
+
+@pytest.mark.parametrize("key", ["base_url", "base_path", "token"])
+def test_load_settings_from_env_with_missing_required_variable_names_variable(
+    monkeypatch, clear_joomla_env, key: str
+) -> None:
+    set_joomla_env(
+        monkeypatch, base_url="https://example.org", base_path="/p", token="t"
+    )
+    monkeypatch.delenv(f"DOCXWIRE_JOOMLA_{key.upper()}")
+
+    with pytest.raises(SettingsError, match=f"DOCXWIRE_JOOMLA_{key.upper()}"):
+        load_settings_from_env()
+
+
+def test_load_settings_from_env_without_default_catid_is_zero(
+    monkeypatch, clear_joomla_env
+) -> None:
+    set_joomla_env(
+        monkeypatch, base_url="https://example.org", base_path="/p", token="t"
+    )
+
+    settings = load_settings_from_env()
+
+    assert settings.joomla.default_catid == 0
+
+
+def test_load_settings_from_env_without_basic_auth_is_unset(
+    monkeypatch, clear_joomla_env
+) -> None:
+    set_joomla_env(
+        monkeypatch, base_url="https://example.org", base_path="/p", token="t"
+    )
+
+    settings = load_settings_from_env()
+
+    assert settings.joomla.basic_auth is None
+
+
+def test_load_settings_from_env_without_default_language_defaults_to_all_languages(
+    monkeypatch, clear_joomla_env
+) -> None:
+    set_joomla_env(
+        monkeypatch, base_url="https://example.org", base_path="/p", token="t"
+    )
+
+    settings = load_settings_from_env()
+
+    assert settings.joomla.default_language == "*"
+
+
+@pytest.mark.parametrize("value", ["abc", ""])
+def test_load_settings_from_env_with_non_integer_default_catid_raises(
+    monkeypatch, clear_joomla_env, value: str
+) -> None:
+    set_joomla_env(
+        monkeypatch,
+        base_url="https://example.org",
+        base_path="/p",
+        token="t",
+        default_catid=value,
+    )
+
+    with pytest.raises(SettingsError, match="DOCXWIRE_JOOMLA_DEFAULT_CATID"):
+        load_settings_from_env()
+
+
+def test_load_settings_from_env_with_empty_string_value_passes_type_check(
+    monkeypatch, clear_joomla_env
+) -> None:
+    set_joomla_env(monkeypatch, base_url="", base_path="/p", token="t")
+
+    settings = load_settings_from_env()
+
+    assert settings.joomla.base_url == ""
 
 
 def test_convert_without_settings_file_succeeds(

@@ -14,14 +14,14 @@ release contains an inaccessible primitive: after it lands,
 ## What Changes
 
 - New `load_settings_from_env()` in `docxwire.settings`: reads
-  `DOXXWIRE_JOOMLA_BASE_URL`, `DOXXWIRE_JOOMLA_BASE_PATH`, and
-  `DOXXWIRE_JOOMLA_TOKEN` (required), plus the optional
-  `DOXXWIRE_JOOMLA_DEFAULT_CATID` (integer, default `0`),
-  `DOXXWIRE_JOOMLA_BASIC_AUTH`, and `DOXXWIRE_JOOMLA_DEFAULT_LANGUAGE`
+  `DOCXWIRE_JOOMLA_BASE_URL`, `DOCXWIRE_JOOMLA_BASE_PATH`, and
+  `DOCXWIRE_JOOMLA_TOKEN` (required), plus the optional
+  `DOCXWIRE_JOOMLA_DEFAULT_CATID` (integer, default `0`),
+  `DOCXWIRE_JOOMLA_BASIC_AUTH`, and `DOCXWIRE_JOOMLA_DEFAULT_LANGUAGE`
   (default `*`), validating its input exactly like the TOML loader does for
   the same values
 - New `--settings-env` CLI flag: settings are read from the
-  `DOXXWIRE_JOOMLA_*` environment variables instead of `settings.toml` in
+  `DOCXWIRE_JOOMLA_*` environment variables instead of `settings.toml` in
   the working directory
 - New `--json` CLI flag: in this mode stdout carries exactly one JSON object
   — on success `{"id": …, "title": …, "note": …}`, on an operational failure
