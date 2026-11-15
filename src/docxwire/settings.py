@@ -7,15 +7,34 @@ settings; the converter works without a settings file.
 
 from __future__ import annotations
 
+import os
 import tomllib
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-__all__ = ["JoomlaSettings", "Settings", "SettingsError", "load_settings"]
+__all__ = [
+    "JoomlaSettings",
+    "Settings",
+    "SettingsError",
+    "load_settings",
+    "load_settings_from_env",
+]
 
 DEFAULT_SETTINGS_FILE = "settings.toml"
 EXAMPLE_SETTINGS_FILE = "settings.toml.example"
 
+ENV_PREFIX = "DOXXWIRE_JOOMLA_"
+
+_JOOMLA_KEYS = (
+    "base_url",
+    "base_path",
+    "basic_auth",
+    "token",
+    "default_catid",
+    "default_language",
+)
 _REQUIRED_JOOMLA_KEYS = ("base_url", "base_path", "token")
 
 
@@ -42,6 +61,53 @@ class Settings:
     joomla: JoomlaSettings
 
 
+def _validate_joomla_section(
+    section: Mapping[str, Any],
+    *,
+    source: str,
+    ref: Callable[[str], str],
+) -> JoomlaSettings:
+    """Validate one ``[joomla]`` section mapping and build the settings.
+
+    *source* prefixes every error message (the TOML file's path, or
+    ``environment``); *ref* renders how a setting is referenced in those
+    messages (the TOML key, or the ``DOXXWIRE_JOOMLA_*`` variable name).
+    The TOML loader and the environment loader share this single rule
+    set, so the two sources cannot drift.
+    """
+    missing = [key for key in _REQUIRED_JOOMLA_KEYS if key not in section]
+    if missing:
+        raise SettingsError(
+            f"{source}: [joomla] is missing required key(s): "
+            f"{', '.join(ref(key) for key in missing)}"
+        )
+
+    for key in _REQUIRED_JOOMLA_KEYS:
+        if not isinstance(section[key], str):
+            raise SettingsError(f"{source}: {ref(key)} must be a string")
+
+    default_catid = section.get("default_catid", 0)
+    if isinstance(default_catid, bool) or not isinstance(default_catid, int):
+        raise SettingsError(f"{source}: {ref('default_catid')} must be an integer")
+
+    basic_auth = section.get("basic_auth")
+    if basic_auth is not None and not isinstance(basic_auth, str):
+        raise SettingsError(f"{source}: {ref('basic_auth')} must be a string")
+
+    default_language = section.get("default_language", "*")
+    if not isinstance(default_language, str):
+        raise SettingsError(f"{source}: {ref('default_language')} must be a string")
+
+    return JoomlaSettings(
+        base_url=section["base_url"],
+        base_path=section["base_path"],
+        basic_auth=basic_auth,
+        token=section["token"],
+        default_catid=default_catid,
+        default_language=default_language,
+    )
+
+
 def load_settings(path: Path | str = DEFAULT_SETTINGS_FILE) -> Settings:
     """Load and validate settings from the TOML file at *path*.
 
@@ -66,35 +132,43 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_FILE) -> Settings:
     if not isinstance(joomla_data, dict):
         raise SettingsError(f"{file_path}: missing [joomla] section")
 
-    missing = [key for key in _REQUIRED_JOOMLA_KEYS if key not in joomla_data]
-    if missing:
-        raise SettingsError(
-            f"{file_path}: [joomla] is missing required key(s): {', '.join(missing)}"
-        )
-
-    for key in _REQUIRED_JOOMLA_KEYS:
-        if not isinstance(joomla_data[key], str):
-            raise SettingsError(f"{file_path}: [joomla].{key} must be a string")
-
-    default_catid = joomla_data.get("default_catid", 0)
-    if isinstance(default_catid, bool) or not isinstance(default_catid, int):
-        raise SettingsError(f"{file_path}: [joomla].default_catid must be an integer")
-
-    basic_auth = joomla_data.get("basic_auth")
-    if basic_auth is not None and not isinstance(basic_auth, str):
-        raise SettingsError(f"{file_path}: [joomla].basic_auth must be a string")
-
-    default_language = joomla_data.get("default_language", "*")
-    if not isinstance(default_language, str):
-        raise SettingsError(f"{file_path}: [joomla].default_language must be a string")
-
-    return Settings(
-        joomla=JoomlaSettings(
-            base_url=joomla_data["base_url"],
-            base_path=joomla_data["base_path"],
-            basic_auth=basic_auth,
-            token=joomla_data["token"],
-            default_catid=default_catid,
-            default_language=default_language,
-        )
+    joomla = _validate_joomla_section(
+        joomla_data,
+        source=str(file_path),
+        ref=lambda key: f"[joomla].{key}",
     )
+    return Settings(joomla=joomla)
+
+
+def load_settings_from_env() -> Settings:
+    """Load and validate settings from the ``DOXXWIRE_JOOMLA_*`` environment.
+
+    ``DOXXWIRE_JOOMLA_BASE_URL``, ``DOXXWIRE_JOOMLA_BASE_PATH``, and
+    ``DOXXWIRE_JOOMLA_TOKEN`` are required; ``DOXXWIRE_JOOMLA_DEFAULT_CATID``,
+    ``DOXXWIRE_JOOMLA_BASIC_AUTH``, and ``DOXXWIRE_JOOMLA_DEFAULT_LANGUAGE``
+    are optional and keep the same defaults as the TOML source.
+    Raises :class:`SettingsError` with an actionable message naming the
+    variable when a required variable is missing or a value fails
+    validation.
+    """
+    section: dict[str, Any] = {}
+    for key in _JOOMLA_KEYS:
+        raw = os.environ.get(ENV_PREFIX + key.upper())
+        if raw is None:
+            continue
+        if key == "default_catid":
+            try:
+                section[key] = int(raw)
+            except ValueError:
+                # Keep the raw value so the shared validator raises the
+                # error naming the variable.
+                section[key] = raw
+        else:
+            section[key] = raw
+
+    joomla = _validate_joomla_section(
+        section,
+        source="environment",
+        ref=lambda key: ENV_PREFIX + key.upper(),
+    )
+    return Settings(joomla=joomla)
