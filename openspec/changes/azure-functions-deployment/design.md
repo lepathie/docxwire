@@ -123,7 +123,7 @@ the package by tag, not from PyPI.
    app setting `PYTHON_VERSION` must match it (noted in `azure/README.md`).
 9. **`azure/README.md` instead of a `docs/` file.** The only
    project-specific setup knowledge is the app-settings names
-   (`DOXXWIRE_JOOMLA_*`, `PUBLISH_API_KEY`, `PYTHON_VERSION`) and the Power
+   (`DOCXWIRE_JOOMLA_*`, `PUBLISH_API_KEY`, `PYTHON_VERSION`) and the Power
    Automate flow contract (endpoint, `X-Api-Key` header, JSON body) — that
    lives in a small README next to the code, linking to the official
    GitHub/Azure docs for the mechanics.

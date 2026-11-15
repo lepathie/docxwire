@@ -33,7 +33,7 @@ deployed to it without further work.
   tracks that pin natively (pip manager, `git-tags` datasource) and opens a
   bump PR per new release, which deploys the function when merged
 - A small `azure/README.md` next to the code (no standalone `docs/` file):
-  the app-settings table (`DOXXWIRE_JOOMLA_*`, `PUBLISH_API_KEY`, and
+  the app-settings table (`DOCXWIRE_JOOMLA_*`, `PUBLISH_API_KEY`, and
   `PYTHON_VERSION` matching the repo's `.python-version`) and the Power
   Automate flow contract (endpoint, `X-Api-Key` header, JSON body), with
   the setup mechanics linked to the official GitHub/Azure documentation

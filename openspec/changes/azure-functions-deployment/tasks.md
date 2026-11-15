@@ -20,7 +20,7 @@ invokes the CLI with `--settings-env --json`).
 
 ## 3. Function app README
 
-- [ ] 3.1 Write `azure/README.md`: the app-settings table (`DOXXWIRE_JOOMLA_*`, `PUBLISH_API_KEY`, `PYTHON_VERSION` — noting it must match the repo's `.python-version` — and `FUNCTIONS_VERSION`), the Power Automate flow contract (endpoint URL, `X-Api-Key` header, JSON body `{"site_id", "list_id", "item_id"}`), a note that the setup must be complete before the change is merged (the first merge is the first deployment), and links to the official GitHub/Azure docs for the identity/consent/secret mechanics; verify every setting name and the request contract match the implementation in `azure/`, and that the README contains no real tenant values
+- [ ] 3.1 Write `azure/README.md`: the app-settings table (`DOCXWIRE_JOOMLA_*`, `PUBLISH_API_KEY`, `PYTHON_VERSION` — noting it must match the repo's `.python-version` — and `FUNCTIONS_VERSION`), the Power Automate flow contract (endpoint URL, `X-Api-Key` header, JSON body `{"site_id", "list_id", "item_id"}`), a note that the setup must be complete before the change is merged (the first merge is the first deployment), and links to the official GitHub/Azure docs for the identity/consent/secret mechanics; verify every setting name and the request contract match the implementation in `azure/`, and that the README contains no real tenant values
 - [ ] 3.2 Verify `make ci` is green with the new README (pymarkdown scans it)
 
 ## 4. Integration verification
