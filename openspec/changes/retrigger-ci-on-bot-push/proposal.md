@@ -15,7 +15,7 @@ GitHub's PR checks view is bound to the check suite created by the PR's `pull_re
 
 ### New Capabilities
 
-- `pr-checks`: Every pull request to `main` has its CI check runs reported in the PR's checks view, including after the orchestrator pushes an auto-fix to the PR branch.
+(None)
 
 ### Modified Capabilities
 

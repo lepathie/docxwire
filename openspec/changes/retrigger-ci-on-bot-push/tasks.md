@@ -11,7 +11,7 @@
 
 - [x] 2.Validate the YAML parses (e.g. `python3 -m yaml ... ` / `openspec`-independent parse) and walk the trigger matrix by hand: (a) in-sync human PR → one re-trigger from `post-upgrade-tasks`; (b) fix push → re-trigger only from the bot-push run's `retrigger-ci`; (c) fork PR → no fix, no re-trigger
 - [x] 2.Unblock PR #12: push a trivial commit (e.g. empty commit) to `renovate/fission-ai-openspec-1.x` and verify the PR's checks view then shows all CI checks (lint, test, check-specs, check-deps, lint-pr-title) green and the PR becomes mergeable
-- [ ] 2.3 On the next PR in which the orchestrator pushes a fix, verify the PR's checks view shows the full CI result for the fixed head and the PR is mergeable without manual intervention
+- [x] 2.3 On the next PR in which the orchestrator pushes a fix, verify the PR's checks view shows the full CI result for the fixed head and the PR is mergeable without manual intervention
 
 ## Workflow follow-up
 
