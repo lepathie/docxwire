@@ -3,15 +3,15 @@ name: CI Pipeline
 on:
   push:
     branches: ["main"]
-  workflow_dispatch:
-    inputs:
-      pr_title:
-        description: "PR title to lint (set by the PR Orchestrator workflow)"
-        required: false
-        type: string
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch: # bare, for manual re-runs
 
 # One job per make target, all running in parallel — `make ci` is the
-# local aggregate of exactly these targets (plus `test`).
+# local aggregate of exactly these targets (plus `test`). PRs get their
+# checks natively from the pull_request trigger: the PR's checks view is
+# bound to the pull_request event's check suite, and a native run's check
+# runs are exactly that suite's runs — no re-trigger, no mirroring.
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -80,7 +80,7 @@ jobs:
         run: make check-deps
 
   lint-pr-title:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.pr_title != ''
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -96,45 +96,5 @@ jobs:
 
       - name: Lint pull request title
         env:
-          PR_TITLE: ${{ github.event.inputs.pr_title }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: echo "$PR_TITLE" | ./node_modules/.bin/commitlint
-
-  publish-pr-checks:
-    needs: [lint, test, check-specs, check-deps, lint-pr-title]
-    if: github.event_name == 'workflow_dispatch' && always()
-    runs-on: ubuntu-latest
-    permissions:
-      checks: write
-    steps:
-      - name: Mirror job conclusions as check runs on the PR head
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.sha }}
-          LINT: ${{ needs['lint'].result }}
-          TEST: ${{ needs['test'].result }}
-          CHECK_SPECS: ${{ needs['check-specs'].result }}
-          CHECK_DEPS: ${{ needs['check-deps'].result }}
-          LINT_PR_TITLE: ${{ needs['lint-pr-title'].result }}
-        run: |
-          mirror() {
-            name="$1"
-            case "$2" in
-              success) conclusion="success" ;;
-              failure) conclusion="failure" ;;
-              cancelled) conclusion="cancelled" ;;
-              *) conclusion="skipped" ;;
-            esac
-            gh api -X POST "repos/$REPO/check-runs" \
-              -f "name=$name" \
-              -f "head_sha=$HEAD_SHA" \
-              -f "status=completed" \
-              -f "conclusion=$conclusion" \
-              -f "output[title]=$name" \
-              -f "output[summary]=Mirrored from the retriggered CI pipeline run"
-          }
-          mirror "lint" "$LINT"
-          mirror "test" "$TEST"
-          mirror "check-specs" "$CHECK_SPECS"
-          mirror "check-deps" "$CHECK_DEPS"
-          mirror "lint-pr-title" "$LINT_PR_TITLE"
