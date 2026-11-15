@@ -31,15 +31,15 @@ JOOMLA_ENV_KEYS = (
 
 @pytest.fixture
 def clear_joomla_env(monkeypatch) -> None:
-    """Remove any inherited DOXXWIRE_JOOMLA_* variables."""
+    """Remove any inherited DOCXWIRE_JOOMLA_* variables."""
     for key in JOOMLA_ENV_KEYS:
-        monkeypatch.delenv(f"DOXXWIRE_JOOMLA_{key.upper()}", raising=False)
+        monkeypatch.delenv(f"DOCXWIRE_JOOMLA_{key.upper()}", raising=False)
 
 
 def set_joomla_env(monkeypatch, **values: str) -> None:
-    """Set the given ``DOXXWIRE_JOOMLA_*`` variables (keyed by setting name)."""
+    """Set the given ``DOCXWIRE_JOOMLA_*`` variables (keyed by setting name)."""
     for key, value in values.items():
-        monkeypatch.setenv(f"DOXXWIRE_JOOMLA_{key.upper()}", value)
+        monkeypatch.setenv(f"DOCXWIRE_JOOMLA_{key.upper()}", value)
 
 
 @pytest.fixture
@@ -266,9 +266,9 @@ def test_load_settings_from_env_with_missing_required_variable_names_variable(
     set_joomla_env(
         monkeypatch, base_url="https://example.org", base_path="/p", token="t"
     )
-    monkeypatch.delenv(f"DOXXWIRE_JOOMLA_{key.upper()}")
+    monkeypatch.delenv(f"DOCXWIRE_JOOMLA_{key.upper()}")
 
-    with pytest.raises(SettingsError, match=f"DOXXWIRE_JOOMLA_{key.upper()}"):
+    with pytest.raises(SettingsError, match=f"DOCXWIRE_JOOMLA_{key.upper()}"):
         load_settings_from_env()
 
 
@@ -320,7 +320,7 @@ def test_load_settings_from_env_with_non_integer_default_catid_raises(
         default_catid=value,
     )
 
-    with pytest.raises(SettingsError, match="DOXXWIRE_JOOMLA_DEFAULT_CATID"):
+    with pytest.raises(SettingsError, match="DOCXWIRE_JOOMLA_DEFAULT_CATID"):
         load_settings_from_env()
 
 

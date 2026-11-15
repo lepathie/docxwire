@@ -25,7 +25,7 @@ __all__ = [
 DEFAULT_SETTINGS_FILE = "settings.toml"
 EXAMPLE_SETTINGS_FILE = "settings.toml.example"
 
-ENV_PREFIX = "DOXXWIRE_JOOMLA_"
+ENV_PREFIX = "DOCXWIRE_JOOMLA_"
 
 _JOOMLA_KEYS = (
     "base_url",
@@ -71,7 +71,7 @@ def _validate_joomla_section(
 
     *source* prefixes every error message (the TOML file's path, or
     ``environment``); *ref* renders how a setting is referenced in those
-    messages (the TOML key, or the ``DOXXWIRE_JOOMLA_*`` variable name).
+    messages (the TOML key, or the ``DOCXWIRE_JOOMLA_*`` variable name).
     The TOML loader and the environment loader share this single rule
     set, so the two sources cannot drift.
     """
@@ -141,11 +141,11 @@ def load_settings(path: Path | str = DEFAULT_SETTINGS_FILE) -> Settings:
 
 
 def load_settings_from_env() -> Settings:
-    """Load and validate settings from the ``DOXXWIRE_JOOMLA_*`` environment.
+    """Load and validate settings from the ``DOCXWIRE_JOOMLA_*`` environment.
 
-    ``DOXXWIRE_JOOMLA_BASE_URL``, ``DOXXWIRE_JOOMLA_BASE_PATH``, and
-    ``DOXXWIRE_JOOMLA_TOKEN`` are required; ``DOXXWIRE_JOOMLA_DEFAULT_CATID``,
-    ``DOXXWIRE_JOOMLA_BASIC_AUTH``, and ``DOXXWIRE_JOOMLA_DEFAULT_LANGUAGE``
+    ``DOCXWIRE_JOOMLA_BASE_URL``, ``DOCXWIRE_JOOMLA_BASE_PATH``, and
+    ``DOCXWIRE_JOOMLA_TOKEN`` are required; ``DOCXWIRE_JOOMLA_DEFAULT_CATID``,
+    ``DOCXWIRE_JOOMLA_BASIC_AUTH``, and ``DOCXWIRE_JOOMLA_DEFAULT_LANGUAGE``
     are optional and keep the same defaults as the TOML source.
     Raises :class:`SettingsError` with an actionable message naming the
     variable when a required variable is missing or a value fails

@@ -31,7 +31,7 @@ non-zero without contacting the site.
 ### Requirement: Settings are loaded from the current working directory
 The command SHALL by default load its settings from the `settings.toml` file
 in the current working directory, and SHALL, when invoked with
-`--settings-env`, load them from the `DOXXWIRE_JOOMLA_*` environment
+`--settings-env`, load them from the `DOCXWIRE_JOOMLA_*` environment
 variables instead, using exactly one source per run. A missing or invalid
 settings source SHALL be reported with an actionable message and SHALL exit
 non-zero before any conversion or network activity.
@@ -48,13 +48,13 @@ non-zero before any conversion or network activity.
 
 #### Scenario: The environment source is used with --settings-env
 - **WHEN** the command is invoked with `--settings-env` and the
-  `DOXXWIRE_JOOMLA_*` environment variables are set
+  `DOCXWIRE_JOOMLA_*` environment variables are set
 - **THEN** the run uses the environment variables' Joomla settings without
   requiring a `settings.toml` in the working directory
 
 #### Scenario: A missing environment source is reported
 - **WHEN** the command is invoked with `--settings-env` and a required
-  `DOXXWIRE_JOOMLA_*` variable is missing
+  `DOCXWIRE_JOOMLA_*` variable is missing
 - **THEN** an actionable message naming the variable is reported and the
   command exits non-zero without contacting the site
 

@@ -6,7 +6,7 @@ land together, so no release ships an inaccessible primitive).
 ## 1. Env-based settings loader
 
 - [x] 1.1 Factor the `[joomla]` section validation (required keys, types, defaults, `SettingsError` messages) out of `load_settings` into a shared helper in `src/docxwire/settings.py` and verify the existing TOML tests in `tests/settings/test_settings.py` still pass unchanged
-- [x] 1.2 Add `load_settings_from_env()` reading `DOXXWIRE_JOOMLA_BASE_URL`, `DOXXWIRE_JOOMLA_BASE_PATH`, `DOXXWIRE_JOOMLA_TOKEN`, `DOXXWIRE_JOOMLA_DEFAULT_CATID`, `DOXXWIRE_JOOMLA_BASIC_AUTH`, `DOXXWIRE_JOOMLA_DEFAULT_LANGUAGE` through the shared helper, with error messages naming the variable; verify `uv run pytest tests/settings` passes
+- [x] 1.2 Add `load_settings_from_env()` reading `DOCXWIRE_JOOMLA_BASE_URL`, `DOCXWIRE_JOOMLA_BASE_PATH`, `DOCXWIRE_JOOMLA_TOKEN`, `DOCXWIRE_JOOMLA_DEFAULT_CATID`, `DOCXWIRE_JOOMLA_BASIC_AUTH`, `DOCXWIRE_JOOMLA_DEFAULT_LANGUAGE` through the shared helper, with error messages naming the variable; verify `uv run pytest tests/settings` passes
 - [x] 1.3 Add the env-loader test matrix from the spec delta: all six variables set → values preserved; each required variable missing → `SettingsError` naming that variable; `default_catid` omitted → `0`; `basic_auth` omitted → unset; `default_language` omitted → `*`; non-integer `default_catid` → `SettingsError`; empty-string value passes the type check as in TOML; verify `uv run pytest tests/settings` passes
 
 ## 2. CLI flags

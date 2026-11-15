@@ -61,14 +61,14 @@ def stub_publish_capturing_settings(monkeypatch) -> list:
 
 
 def write_env_settings(monkeypatch, **values: str) -> None:
-    """Set the given ``DOXXWIRE_JOOMLA_*`` variables (keyed by setting)."""
+    """Set the given ``DOCXWIRE_JOOMLA_*`` variables (keyed by setting)."""
     for key, value in values.items():
-        monkeypatch.setenv(f"DOXXWIRE_JOOMLA_{key.upper()}", value)
+        monkeypatch.setenv(f"DOCXWIRE_JOOMLA_{key.upper()}", value)
 
 
 @pytest.fixture
 def clear_joomla_env(monkeypatch) -> None:
-    """Remove any inherited DOXXWIRE_JOOMLA_* variables."""
+    """Remove any inherited DOCXWIRE_JOOMLA_* variables."""
     for key in (
         "base_url",
         "base_path",
@@ -77,7 +77,7 @@ def clear_joomla_env(monkeypatch) -> None:
         "default_catid",
         "default_language",
     ):
-        monkeypatch.delenv(f"DOXXWIRE_JOOMLA_{key.upper()}", raising=False)
+        monkeypatch.delenv(f"DOCXWIRE_JOOMLA_{key.upper()}", raising=False)
 
 
 class TestCliSuccess:
@@ -299,7 +299,7 @@ class TestCliSettingsEnv:
 
         err = capsys.readouterr().err
         assert code == 1
-        assert "DOXXWIRE_JOOMLA_TOKEN" in err
+        assert "DOCXWIRE_JOOMLA_TOKEN" in err
         # No conversion or network activity.
         assert calls == []
 

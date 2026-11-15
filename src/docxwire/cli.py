@@ -40,7 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--settings-env",
         action="store_true",
-        help="load settings from the DOXXWIRE_JOOMLA_* environment variables "
+        help="load settings from the DOCXWIRE_JOOMLA_* environment variables "
         "instead of settings.toml",
     )
     return parser
@@ -49,7 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _load_settings(args: argparse.Namespace) -> Settings:
     """Load settings from the source the flags select.
 
-    ``--settings-env`` selects the ``DOXXWIRE_JOOMLA_*`` environment
+    ``--settings-env`` selects the ``DOCXWIRE_JOOMLA_*`` environment
     variables; otherwise the ``settings.toml`` in the current working
     directory is used.
     """
