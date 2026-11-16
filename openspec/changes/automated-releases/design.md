@@ -116,6 +116,24 @@ to a person. With PSR that judgment moves upstream into the commit messages,
 which this repo already disciplines (commitlint, motivation in the body).
 Accepted for a single-maintainer tool.
 
+Scope convention: the product is a single-component CLI, so a `cli` scope
+is noise — PSR renders it as a `**cli**:` prefix on every entry. Commits
+should omit the scope (`feat: …`); commitlint already allows that. Scopes
+stay available for a day when real sub-areas (`converter`, `joomla`) emerge.
+
+### 9. The changelog shows only user-facing changes
+
+The first automated release (v0.2.0) showed the cost of an unfiltered
+changelog: Renovate `chore(deps)`, OpenSpec workflow `chore(openspec)`, and
+`ci` housekeeping made up most of the entries, burying the one real feature.
+`changelog.exclude_commit_patterns` therefore drops the non-user-facing
+types (`chore`, `ci`, `build`, `refactor`, `style`, `test`) from the
+rendered entries — a standard config option, not a custom template, so the
+default rendering (decision 4) is otherwise untouched; this is the same
+curation release-please applies by default. `CHANGELOG.md` is excluded from
+pymarkdown (`system.exclude_path`): the file is machine-generated and its
+whitespace belongs to PSR's template, which the linter rejects (MD012/MD022).
+
 ## Risks / Trade-offs
 
 - **A release can be cut from a red push** (no CI gate, decision 1): the

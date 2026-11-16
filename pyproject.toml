@@ -45,7 +45,7 @@ addopts = "--cov-fail-under=100"
 [tool.pymarkdown]
 extensions.front-matter.enabled = true
 plugins.md013.enabled = false
-system.exclude_path = ["openspec", ".agents/skills/openspec-*"]
+system.exclude_path = ["openspec", ".agents/skills/openspec-*", "CHANGELOG.md"]
 
 [tool.semantic_release]
 branch = "main"
@@ -56,6 +56,16 @@ uv pip install -e '.[build]'
 uv lock --upgrade-package "$PACKAGE_NAME"
 git add uv.lock
 """
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    "chore(?:\\([^)]*\\))?: .+",
+    "ci(?:\\([^)]*\\))?: .+",
+    "build(?:\\([^)]*\\))?: .+",
+    "refactor(?:\\([^)]*\\))?: .+",
+    "style(?:\\([^)]*\\))?: .+",
+    "test(?:\\([^)]*\\))?: .+",
+]
 
 # The token (GITHUB_TOKEN) is used for the Releases API only; pushes go
 # through the deploy key loaded into the ssh-agent by the workflow

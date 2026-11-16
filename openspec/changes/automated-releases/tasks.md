@@ -33,5 +33,11 @@
 
 ## 7. First automated release (user action)
 
-- [ ] 7.1 Push the deploy-key arming commit to `main` — the pending `feat(cli)` commit is already in the untagged range, so this push alone cuts the first release (no extra `fix:` commit needed)
-- [ ] 7.2 Verify the pipeline cut `v0.2.0`: the release commit contains the stamped `pyproject.toml`, the re-stamped `uv.lock`, and the `CHANGELOG.md` entry; the `v0.2.0` tag exists; the GitHub Release notes mirror the entry
+- [x] 7.1 Push the deploy-key arming commit to `main` — the pending `feat(cli)` commit is already in the untagged range, so this push alone cuts the first release (no extra `fix:` commit needed)
+- [x] 7.2 Verify the pipeline cut `v0.2.0`: the release commit contains the stamped `pyproject.toml`, the re-stamped `uv.lock`, and the `CHANGELOG.md` entry; the `v0.2.0` tag exists; the GitHub Release notes mirror the entry
+
+## 8. Changelog curation (post-v0.2.0)
+
+- [x] 8.1 Exclude `CHANGELOG.md` from pymarkdown (`system.exclude_path`) — generated file, template-owned whitespace (MD012/MD022)
+- [x] 8.2 Add a `[tool.semantic_release.changelog]` section with `exclude_commit_patterns` dropping `chore`/`ci`/`build`/`refactor`/`style`/`test` from the rendered entries (v0.2.0's notes were mostly Renovate and OpenSpec housekeeping)
+- [ ] 8.3 Push to `main` (`ci:` type — no release is cut) and verify the CI pipeline is green again
