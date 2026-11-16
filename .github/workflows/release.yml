@@ -21,21 +21,42 @@ jobs:
       contents: write
 
     steps:
-      # Check out the repository at the branch that triggered the workflow.
-      # PSR converts the shallow clone to a full clone automatically if needed.
+      # Check out over SSH with the deploy key: the deploy key (a ruleset
+      # bypass actor) is what lets the release push land on the protected
+      # main. fetch-depth 0: PSR needs the full history to compute the
+      # version.
       - name: Setup | Checkout repository on release branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      # Loads the deploy key into an ssh-agent so the git push PSR performs
+      # authenticates with it (the remote config ignores GITHUB_TOKEN for
+      # pushes).
+      - name: Setup | SSH agent with deploy key
+        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Setup | Configure git
+        run: |
+          git config --local user.email "github-actions@github.com"
+          git config --local user.name "GitHub Actions"
 
       # Force the release branch to the workflow sha: the branch may have
       # moved while the run is in flight, which must not be released.
       - name: Setup | Force release branch to workflow sha
         run: git reset --hard ${{ github.sha }}
 
+      - name: Setup | Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c9238fd43a15bba460eec2 # v10.3.3
+
+      # PSR CLI (not the Docker action, which would lose the SSH agent
+      # context): the push goes through the deploy key above, while
+      # GITHUB_TOKEN is used only for the Releases API.
       - name: Action | Semantic version release
-        uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          git_committer_name: "github-actions"
-          git_committer_email: "actions@users.noreply.github.com"
+        run: uv run --with 'python-semantic-release==10.7.0' semantic-release -v version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

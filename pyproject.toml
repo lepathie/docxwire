@@ -52,10 +52,19 @@ branch = "main"
 allow_zero_version = true
 version_toml = ["pyproject.toml:project.version"]
 build_command = """
-pip install -e '.[build]'
+uv pip install -e '.[build]'
 uv lock --upgrade-package "$PACKAGE_NAME"
 git add uv.lock
 """
+
+# The token (GITHUB_TOKEN) is used for the Releases API only; pushes go
+# through the deploy key loaded into the ssh-agent by the workflow
+# (the key is a ruleset bypass actor on the protected main branch).
+[tool.semantic_release.remote]
+name = "origin"
+type = "github"
+token = { env = "GITHUB_TOKEN" }
+ignore_token_for_push = true
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14"]

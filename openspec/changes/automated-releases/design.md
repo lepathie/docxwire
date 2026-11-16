@@ -8,7 +8,7 @@ a `uv sync --frozen` CI, and Renovate managing dependencies (including weekly
 lockfile maintenance). No release tooling exists. python-semantic-release (PSR) was chosen over release-please and
 semantic-release (JS) for its
 first-class uv integration — re-stamping `uv.lock` in the release commit via
-`build_command` — and its official GitHub Action.
+`build_command`.
 
 ## Goals / Non-Goals
 
@@ -52,11 +52,11 @@ would desync `uv.lock` and break the next CI run. Per PSR's uv integration
 guide, the `build_command` runs `uv lock --upgrade-package "$PACKAGE_NAME"`
 (updates only the project's own version in the lock, never the
 dependencies) and `git add uv.lock`, so the lockfile lands in the release
-commit. The PSR action is Docker-based and does not ship `uv`, so the
-`build_command` first installs it from a new `build`
-optional-dependencies extra (`pip install -e '.[build]'`); pinning `uv`
-there lets Renovate keep it current. No `uv build` step — no distribution
-artifacts are built.
+commit. The `build_command` runs inside the uv-managed venv that `uv run`
+creates for the CLI (decision 6), which ships no `pip`, so the project is
+installed with `uv pip install -e '.[build]'` from a new `build`
+optional-dependencies extra; pinning `uv` there lets Renovate keep it
+current. No `uv build` step — no distribution artifacts are built.
 
 ### 4. Manual `v0.1.0` baseline; PSR generates the changelog
 
@@ -78,17 +78,37 @@ cut a release; the next real `feat`/`fix` does.
 
 ### 6. Workflow shape
 
-Per the PSR GitHub Actions documentation: `on: push` to `main`; a
-concurrency group (`release-<ref>`, `cancel-in-progress: false`) so rapid
-successive pushes cannot race two release jobs; checkout at
-`github.ref_name` followed by `git reset --hard ${{ github.sha }}` so a
-branch that moves while the run is in flight cannot release un-evaluated
-changes; `contents: write` scoped to the release job only (least privilege);
-`GITHUB_TOKEN` as the action token; the action pinned with a version comment
-matching the `ci.yaml` pinning convention. No `fetch-depth: 0` needed —
-PSR ≥ 10.5 unshallows automatically.
+`on: push` to `main`; a concurrency group (`release-<ref>`,
+`cancel-in-progress: false`) so rapid successive pushes cannot race two
+release jobs; checkout at `github.ref_name` with `fetch-depth: 0` (PSR needs
+the full history to compute the version) followed by
+`git reset --hard ${{ github.sha }}` so a branch that moves while the run is
+in flight cannot release un-evaluated changes; `contents: write` scoped to
+the release job only (least privilege); every action pinned with a version
+comment matching the `ci.yaml` pinning convention. PSR runs as the **CLI**
+(`uv run --with 'python-semantic-release==<pin>' semantic-release version`)
+rather than the official Docker action: the Docker container cannot see the
+runner's SSH agent, which the release push depends on (decision 8).
 
-### 7. Curation lives in the commit messages
+### 7. The release push goes through a deploy key (ruleset bypass)
+
+`main` is protected by a repository **ruleset** with required status checks.
+A release commit pushed by the workflow would arrive with no status checks
+of its own, so the ruleset rejects the push — the push that is meant to
+*trigger* the checks is blocked *by* them (the chicken-and-egg that failed
+the first armed run with `GH006: Protected branch update failed`). Granting
+the `github-actions` identity ruleset bypass would let every workflow bypass
+the ruleset; instead a dedicated **deploy key** (write access, scoped to this
+one repository) is added as the ruleset's bypass actor. The workflow
+authenticates the checkout (`ssh-key:`) and the push (via
+`webfactory/ssh-agent`) with that key, and
+`[tool.semantic_release.remote]` sets `ignore_token_for_push = true` so
+`GITHUB_TOKEN` is never used for the git push — it remains the credential
+for the Releases API only. The key is a repository secret (`DEPLOY_KEY`) and
+can be rotated or revoked without touching the ruleset. This is the pattern
+documented in PSR issue #1343.
+
+### 8. Curation lives in the commit messages
 
 Keep a Changelog 2.0.0 cautions that a changelog generated from commit
 messages is "raw material at best" — the judgment of what is notable belongs
@@ -104,6 +124,13 @@ Accepted for a single-maintainer tool.
 - **`build_command` failure**: PSR aborts the release before tagging — the
   workflow fails visibly and nothing is published; the commit is assembled
   before the tag/push, so there is no partial state.
-- **Docker-action constraints** (no `uv`, no caching, fixed Python):
-  mitigated by the documented `build`-extra install; the lock re-stamp is a
-  single fast `uv lock` run.
+- **A standing write credential to `main`** (deploy key, decision 7): it is
+  scoped to this repository only (deploy keys cannot be org-wide), its use
+  is limited to the one release workflow, and it is rotatable by replacing
+  the `DEPLOY_KEY` secret and the key in the ruleset — no workflow or
+  ruleset change required.
+- **The release workflow depends on repo settings outside the repo**
+  (deploy key + ruleset bypass actor): a settings regression (key removed,
+  bypass actor dropped) surfaces as a visible `GH006` push failure with no
+  partial state — the release commit simply does not land and the next
+  releasable push retries.

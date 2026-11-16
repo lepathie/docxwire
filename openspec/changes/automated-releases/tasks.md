@@ -3,11 +3,11 @@
 ## 1. PSR configuration (`pyproject.toml`)
 
 - [x] 1.1 Add a `build` optional-dependencies extra pinning `uv`
-- [x] 1.2 Add a `[tool.semantic_release]` section: `version_toml = ["pyproject.toml:project.version"]`, `branch = "main"`, `allow_zero_version = true`, and a `build_command` that installs the `build` extra, runs `uv lock --upgrade-package "$PACKAGE_NAME"`, and stages `uv.lock` (no `changelog` section — the default init mode generates `CHANGELOG.md`, initial release masked)
+- [x] 1.2 Add a `[tool.semantic_release]` section: `version_toml = ["pyproject.toml:project.version"]`, `branch = "main"`, `allow_zero_version = true`, a `build_command` that installs the `build` extra (`uv pip` — the `uv run` venv ships no `pip`), runs `uv lock --upgrade-package "$PACKAGE_NAME"`, and stages `uv.lock` (no `changelog` section — the default init mode generates `CHANGELOG.md`, initial release masked), and a `[tool.semantic_release.remote]` section with `token = { env = "GITHUB_TOKEN" }` and `ignore_token_for_push = true`
 
 ## 2. Release workflow
 
-- [x] 2.1 Add `.github/workflows/release.yml` per the PSR GitHub Actions pattern: `on: push` to `main`, concurrency group, checkout at `github.ref_name` + reset to `github.sha`, the PSR action pinned with a version comment, `contents: write` scoped to the job, `GITHUB_TOKEN`
+- [x] 2.1 Add `.github/workflows/release.yml`: `on: push` to `main`, concurrency group, SSH checkout (`ssh-key: DEPLOY_KEY`, `fetch-depth: 0`) at `github.ref_name` + reset to `github.sha`, `webfactory/ssh-agent` loading the deploy key, `astral-sh/setup-uv`, the PSR CLI via `uv run --with` (pinned, not the Docker action — it can't see the SSH agent), `contents: write` scoped to the job, `GITHUB_TOKEN` for the Releases API only
 - [x] 2.2 Lint the workflow (e.g. `uvx actionlint .github/workflows/release.yml`)
 
 ## 3. Verification
@@ -24,7 +24,14 @@
 
 - [x] 5.1 Commit this change (code + `openspec/changes/automated-releases/`) with a `chore(release):` message and push to `main` — the workflow becomes active and no release is cut (`chore` is not releasable`)
 
-## 6. First automated release (user action)
+## 6. Deploy key setup (user action)
 
-- [ ] 6.1 Push a small `fix:` commit to `main`
-- [ ] 6.2 Verify the pipeline cut `v0.1.1`: the release commit contains the stamped `pyproject.toml`, the re-stamped `uv.lock`, and the `CHANGELOG.md` entry; the `v0.1.1` tag exists; the GitHub Release notes mirror the entry
+- [ ] 6.1 Generate an ed25519 SSH keypair without a passphrase
+- [ ] 6.2 Add the public key to the repository as a deploy key **with write access**
+- [ ] 6.3 Add the deploy key to the `main` ruleset's bypass actors
+- [ ] 6.4 Set the `DEPLOY_KEY` repository secret to the private key
+
+## 7. First automated release (user action)
+
+- [ ] 7.1 Push the deploy-key arming commit to `main` — the pending `feat(cli)` commit is already in the untagged range, so this push alone cuts the first release (no extra `fix:` commit needed)
+- [ ] 7.2 Verify the pipeline cut `v0.2.0`: the release commit contains the stamped `pyproject.toml`, the re-stamped `uv.lock`, and the `CHANGELOG.md` entry; the `v0.2.0` tag exists; the GitHub Release notes mirror the entry
