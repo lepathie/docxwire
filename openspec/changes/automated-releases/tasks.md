@@ -26,10 +26,10 @@
 
 ## 6. Deploy key setup (user action)
 
-- [ ] 6.1 Generate an ed25519 SSH keypair without a passphrase
-- [ ] 6.2 Add the public key to the repository as a deploy key **with write access**
-- [ ] 6.3 Add the deploy key to the `main` ruleset's bypass actors
-- [ ] 6.4 Set the `DEPLOY_KEY` repository secret to the private key
+- [x] 6.1 Generate an ed25519 SSH keypair without a passphrase
+- [x] 6.2 Add the public key to the repository as a deploy key **with write access**
+- [x] 6.3 Add the deploy key to the `main` ruleset's bypass actors
+- [x] 6.4 Set the `DEPLOY_KEY` repository secret to the private key
 
 ## 7. First automated release (user action)
 
@@ -40,4 +40,4 @@
 
 - [x] 8.1 Exclude `CHANGELOG.md` from pymarkdown (`system.exclude_path`) — generated file, template-owned whitespace (MD012/MD022)
 - [x] 8.2 Add a `[tool.semantic_release.changelog]` section with `exclude_commit_patterns` dropping `chore`/`ci`/`build`/`refactor`/`style`/`test` from the rendered entries (v0.2.0's notes were mostly Renovate and OpenSpec housekeeping)
-- [ ] 8.3 Push to `main` (`ci:` type — no release is cut) and verify the CI pipeline is green again
+- [x] 8.3 Push to `main` (`ci:` type — no release is cut) and verify the CI pipeline is green again

@@ -116,10 +116,9 @@ to a person. With PSR that judgment moves upstream into the commit messages,
 which this repo already disciplines (commitlint, motivation in the body).
 Accepted for a single-maintainer tool.
 
-Scope convention: the product is a single-component CLI, so a `cli` scope
-is noise — PSR renders it as a `**cli**:` prefix on every entry. Commits
-should omit the scope (`feat: …`); commitlint already allows that. Scopes
-stay available for a day when real sub-areas (`converter`, `joomla`) emerge.
+Scope convention: the maintainer keeps scopes even for a single-component
+CLI — the rendered `**cli**:` prefix is informative, and scopes will start
+to discriminate real sub-areas (`converter`, `joomla`) as the project grows.
 
 ### 9. The changelog shows only user-facing changes
 
@@ -133,6 +132,16 @@ default rendering (decision 4) is otherwise untouched; this is the same
 curation release-please applies by default. `CHANGELOG.md` is excluded from
 pymarkdown (`system.exclude_path`): the file is machine-generated and its
 whitespace belongs to PSR's template, which the linter rejects (MD012/MD022).
+
+## Considered and deferred
+
+- **Signed release commits/tags**: PSR's `git commit`/`git tag` would honor
+  SSH signing config, and the PSR Docker action even takes
+  `ssh_*_signing_key` inputs for it — but the signature would have to be
+  registered to an account, and no account corresponds to the release
+  commit's `semantic-release` identity. Deferred; the release commit and
+  tag remain the only unverified entries in the log (v0.2.0's cannot be
+  retroactively signed — commit objects are immutable).
 
 ## Risks / Trade-offs
 
